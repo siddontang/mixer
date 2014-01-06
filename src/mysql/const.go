@@ -1,4 +1,4 @@
-package proxy
+package mysql
 
 const (
 	MinProtocolVersion byte   = 10

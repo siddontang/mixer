@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"github/siddontang/golib/log"
+	"github.com/siddontang/golib/log"
 )
 
 type Proxy struct {
@@ -9,6 +9,7 @@ type Proxy struct {
 }
 
 func NewProxy(cfg *Config) *Proxy {
+	log.Info("NewProxy")
 	p := new(Proxy)
 
 	p.cfg = cfg
