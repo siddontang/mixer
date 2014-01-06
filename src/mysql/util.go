@@ -4,6 +4,8 @@ import (
 	"crypto/sha1"
 )
 
+type RawBytes []bytetl0610TLS
+
 func calcPassword(scramble, password []byte) []byte {
 	if len(password) == 0 {
 		return nil

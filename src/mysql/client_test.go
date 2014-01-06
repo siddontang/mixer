@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"github.com/siddontang/golib/log"
+	"sync"
 	"testing"
 )
 
@@ -9,19 +11,31 @@ var TestDBUser = "qing"
 var TestDBPassword = "admin"
 var TestDBName = "test"
 
-func TestClient_Connect(t *testing.T) {
-	client := NewClient()
+var testClient *Client
 
-	err := client.Connect(TestDBAddr, TestDBUser, TestDBPassword, TestDBName)
+var testClientOnce sync.Once
 
-	if err != nil {
-		t.Fatal(err)
+func newTestClient() *Client {
+	f := func() {
+		testClient = NewClient()
+
+		err := testClient.Connect(TestDBAddr, TestDBUser, TestDBPassword, TestDBName)
+
+		if err != nil {
+			log.Fatal(err.Error())
+		}
 	}
+
+	testClientOnce.Do(f)
+
+	return testClient
+}
+
+func TestClient_Connect(t *testing.T) {
+	client := newTestClient()
 
 	t.Log("capability: ", client.capability)
 	t.Log("status: ", client.status)
 	t.Log("authData: ", string(client.authData))
 	t.Log("authName: ", client.authName)
-
-	client.Close()
 }

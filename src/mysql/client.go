@@ -15,6 +15,8 @@ var (
 	ErrPacketSequence  = errors.New("invalid packet sequence")
 	ErrProtocolVersion = errors.New("invalid protocol version")
 	ErrEOFPacket       = errors.New("eof packet")
+	ErrNotSupported    = errors.New("not supported")
+	ErrMismatchColumns = errors.New("column mismatch")
 )
 
 //proxy <-> mysql server
@@ -45,20 +47,36 @@ func NewClient() *Client {
 }
 
 func (c *Client) Connect(address string, user string, password string, db string) error {
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		log.Error("connect %s error %s", address, err.Error())
-		return err
-	}
-
 	c.address = address
 
 	c.user = user
 	c.password = password
 	c.db = db
 
+	c.conn = nil
+
+	return c.ReConnect()
+}
+
+func (c *Client) ReConnect() error {
+	if c.conn != nil {
+		c.conn.Close()
+	}
+
+	conn, err := net.Dial("tcp", c.address)
+	if err != nil {
+		log.Error("connect %s error %s", c.address, err.Error())
+		return err
+	}
+
 	c.conn = conn
 	c.sequence = 0
+
+	c.authData = []byte{}
+	c.authName = ""
+	c.capability = 0
+	c.charset = 0
+	c.status = 0
 
 	if err := c.readInitPacket(); err != nil {
 		log.Error("read initial handshake packet error %s", err.Error())
@@ -70,7 +88,7 @@ func (c *Client) Connect(address string, user string, password string, db string
 		return err
 	}
 
-	if err := c.ReadResultOKPacket(); err != nil {
+	if err := c.readResultOKPacket(); err != nil {
 		log.Error("read result ok packet error %s", err.Error())
 		return err
 	}
@@ -83,6 +101,8 @@ func (c *Client) Close() error {
 	if err != nil {
 		return err
 	}
+
+	c.conn = nil
 
 	return nil
 }
@@ -203,6 +223,11 @@ func (c *Client) handleErrorPacket(data []byte) error {
 		Code:    errorCode,
 		Message: string(data[pos:]),
 	}
+}
+
+func (c *Client) handleLocalInFilePacket(data []byte) error {
+	//now we not support local in file protocol
+	return ErrNotSupported
 }
 
 func (c *Client) readInitPacket() error {
@@ -342,7 +367,7 @@ func (c *Client) writeAuthPacket() error {
 	return c.writePacket(data)
 }
 
-func (c *Client) ReadResultOKPacket() error {
+func (c *Client) readResultOKPacket() error {
 	data, err := c.readPacket()
 	if err == nil {
 		switch data[0] {
@@ -355,4 +380,139 @@ func (c *Client) ReadResultOKPacket() error {
 		}
 	}
 	return err
+}
+
+func (c *Client) readTextResultSetColumns(count uint64) (columns [][]byte, err error) {
+	var i uint64
+	var data []byte
+
+	columns = make([][]byte, count)
+
+	for {
+		data, err = c.readPacket()
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_Packet && len(data) < 9 {
+			if i != count {
+				log.Error("ColumnsCount mismatch n:%d len:%d", count, len(columns))
+				err = ErrMismatchColumns
+			}
+			return
+		}
+
+		columns[i] = data
+
+		i++
+	}
+}
+
+func (c *Client) readTextResultSetRows() (rows [][]byte, err error) {
+	var data []byte
+
+	rows = make([][]byte)
+
+	for {
+		data, err = c.readPacket()
+
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_Packet && len(data) < 9 {
+			return
+		}
+
+		rows = append(rows, data)
+	}
+}
+
+func (c *Client) readTextResultSetPacket() (columns [][]byte, rows [][]byte, err error) {
+	var data []byte
+
+	data, err = c.readPacket()
+	if err != nil {
+		return
+	}
+
+	switch data[0] {
+	case OK_Packet:
+		err = c.handleOKPacket(data)
+		return
+	case ERR_Packet:
+		err = c.handleErrorPacket(data)
+		return
+	case LocalInFile_Packet:
+		err = c.handleLocalInFilePacket(data[1:])
+		return
+	}
+
+	// column count
+	count, _, n := readLengthEncodedInteger(data)
+	if n-len(data) != 0 {
+		err = ErrMalformPacket
+		return
+	}
+
+	columns, err = c.readTextResultSetColumns(count)
+	if err != nil {
+		return
+	}
+
+	rows, err = c.readTextResultSetRows()
+
+	return
+}
+
+func (c *Client) writeCommandPacket(command byte) error {
+	c.sequence = 0
+
+	return c.writePacket([]byte{
+		0x01, //1 bytes long
+		0x00,
+		0x00,
+		0x00, //sequence
+		command,
+	})
+}
+
+func (c *Client) writeCommandPacketStr(command byte, arg string) error {
+	c.sequence = 0
+
+	length := len(arg) + 1
+
+	data := make([]byte, length+4)
+
+	//header, will be calculated in writePacket
+	//data[0] = byte(length)
+	//data[1] = byte(length >> 8)
+	//data[2] = byte(length >> 16)
+	//data[3] = c.sequence
+
+	data[4] = command
+
+	copy(data[5:], arg)
+
+	return c.writePacket(data)
+}
+
+func (c *Client) writeCommandPacketUint32(command byte, arg uint32) error {
+	c.sequence = 0
+
+	return c.writePacket([]byte{
+		0x05, //5 bytes long
+		0x00,
+		0x00,
+		0x00, //sequence
+
+		command,
+
+		byte(arg),
+		byte(arg >> 8),
+		byte(arg >> 16),
+		byte(arg >> 24),
+	})
 }
