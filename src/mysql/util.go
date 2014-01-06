@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"crypto/sha1"
+	"io"
 )
 
 type RawBytes []bytetl0610TLS
@@ -33,6 +34,38 @@ func calcPassword(scramble, password []byte) []byte {
 		scramble[i] ^= stage1[i]
 	}
 	return scramble
+}
+
+func readLengthEnodedString(b []byte) ([]byte, bool, int, error) {
+	// Get length
+	num, isNull, n := readLengthEncodedInteger(b)
+	if num < 1 {
+		return nil, isNull, n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return b[n-int(num) : n], false, n, nil
+	}
+	return nil, false, n, io.EOF
+}
+
+func skipLengthEnodedString(b []byte) (int, error) {
+	// Get length
+	num, _, n := readLengthEncodedInteger(b)
+	if num < 1 {
+		return n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return n, nil
+	}
+	return n, io.EOF
 }
 
 func readLengthEncodedInteger(b []byte) (num uint64, isNull bool, n int) {
