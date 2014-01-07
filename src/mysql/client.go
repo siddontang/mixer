@@ -412,7 +412,7 @@ func (c *Client) readTextResultSetColumns(count uint64) (columns [][]byte, err e
 func (c *Client) readTextResultSetRows() (rows [][]byte, err error) {
 	var data []byte
 
-	rows = make([][]byte)
+	rows = make([][]byte, 0)
 
 	for {
 		data, err = c.readPacket()
