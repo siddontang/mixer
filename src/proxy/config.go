@@ -1,33 +1,84 @@
 package proxy
 
 import (
-	"encoding/json"
-	"github.com/siddontang/golib/log"
 	"io/ioutil"
+	"launchpad.net/goyaml"
+	"path"
 )
 
-type Config struct {
-	Address  string   `json:"address"`
-	Masters  []string `json:"backend-addresses"`
-	Salves   []string `json:"read-only-backend-addresses"`
-	User     string   `json:"user"`
-	Password string   `json:"password"`
+type ConfigServer struct {
+	Addr     string `yaml:"addr"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
-func NewConfig(configFile string) (*Config, error) {
-	log.Info("new config %s", configFile)
+type ConfigSchema struct {
+	DataNodes []struct {
+		Name     string `yaml:"name"`
+		Addr     string `yaml:"addr"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		Mode     string `yaml:"mode"`
+	} `yaml:"datanodes`
 
-	data, err := ioutil.ReadFile(configFile)
+	Schemas []struct {
+		Name    string   `yaml:"name"`
+		Nodes   []string `yaml:"nodes"`
+		RWSplit bool     `yaml:"rw_split"`
+	} `yaml:"schemas"`
+}
 
+type Config struct {
+	ConfigServer
+	ConfigSchema
+}
+
+func (c *Config) loadServer(configFile string) error {
+	b, err := ioutil.ReadFile(configFile)
 	if err != nil {
+		return err
+	}
+
+	err = goyaml.Unmarshal(b, &c.ConfigServer)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Config) loadSchema(configFile string) error {
+	b, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		return err
+	}
+
+	err = goyaml.Unmarshal(b, &c.ConfigSchema)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Config) loadRule(configFile string) error {
+	return nil
+}
+
+func NewConfig(configDir string) (*Config, error) {
+	c := new(Config)
+
+	if err := c.loadServer(path.Join(configDir, "server.yaml")); err != nil {
 		return nil, err
 	}
 
-	var c Config
-
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := c.loadSchema(path.Join(configDir, "schema.yaml")); err != nil {
 		return nil, err
 	}
 
-	return &c, nil
+	if err := c.loadRule(path.Join(configDir, "rule.yaml")); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }

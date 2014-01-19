@@ -5,10 +5,8 @@ import (
 )
 
 func TestNewConfig(t *testing.T) {
-	c, err := NewConfig("../etc/proxy.json")
+	_, err := NewConfig("../etc/proxy")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Log(c.Address)
 }
