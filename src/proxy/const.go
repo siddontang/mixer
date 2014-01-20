@@ -4,6 +4,7 @@ const (
 	MinProtocolVersion byte   = 10
 	MaxPayloadLen      int    = 1<<24 - 1
 	TimeFormat         string = "2006-01-02 15:04:05"
+	ServerVersion      string = "5.5.31-mixer-0.1"
 )
 
 const (
@@ -140,5 +141,10 @@ const (
 )
 
 const (
-	UTF8_CHARSET byte = 33
+	DEFAULT_CAPABILITY = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS | CLIENT_LONG_FLAG |
+		CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
+
+	DEFAULT_UTF8_CHARSET byte = 33
+
+	AUTH_NAME = "mysql_native_password"
 )

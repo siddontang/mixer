@@ -1,13 +1,13 @@
 #datanodes represent real mysql instance
 datanodes:
     -   name: node1:
-        addr: 127.0.0.1:3306
-        user: root
+        addr: 10.20.135.213:3306
+        user: qing
         password: admin
         mode: master
     -   name: node2:
-        addr: 127.0.0.1:3307
-        user: root
+        addr: 10.20.135.213:3306
+        user: qing
         password: admin
         mode: slave
 #schemas supply an unity entrance for client use
