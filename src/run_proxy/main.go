@@ -5,7 +5,7 @@ import (
 	"proxy"
 )
 
-var configDir = flag.String("configDir", "../etc", "config directory")
+var configDir = flag.String("configDir", "../etc/proxy", "config directory")
 
 func main() {
 	flag.Parse()

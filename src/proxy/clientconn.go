@@ -179,7 +179,10 @@ func (c *ClientConn) readHandshakeResponse() error {
 	}
 
 	//auth name
-	//authName := string(buf[pos:bytes.IndexByte(buf[pos:], 0)])
+	authName := string(buf[pos:bytes.IndexByte(buf[pos:], 0)])
+	if authName != AUTH_NAME {
+		return NewDefaultMySQLError(ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
+	}
 
 	return nil
 }
