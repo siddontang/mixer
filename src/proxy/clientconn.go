@@ -9,7 +9,8 @@ import (
 )
 
 var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS | CLIENT_LONG_FLAG |
-	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
+	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
+	CLIENT_INTERACTIVE | CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS | CLIENT_PS_MULTI_RESULTS
 
 //client <-> proxy
 type ClientConn struct {
@@ -33,7 +34,7 @@ type ClientConn struct {
 	running bool
 }
 
-var BaseConnectionId uint32 = 1000
+var BaseConnectionId uint32 = 10000
 
 func NewClientConn(s *Server, c net.Conn) *ClientConn {
 	conn := new(ClientConn)
@@ -75,6 +76,8 @@ func (c *ClientConn) Handshake() error {
 		return err
 	}
 
+	c.sequence = 0
+
 	return nil
 }
 
@@ -101,7 +104,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	buf = append(buf, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	buf = append(buf, c.charset)
+	buf = append(buf, DEFAULT_UTF8_CHARSET)
 
 	//status
 	buf = append(buf, byte(c.status), byte(c.status>>8))
@@ -110,8 +113,8 @@ func (c *ClientConn) writeInitialHandshake() error {
 	//capability flag upper 2 bytes, using default capability here
 	buf = append(buf, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
 
-	//filter [15], for wireshark dump, value is 15
-	buf = append(buf, 15)
+	//filter [0x15], for wireshark dump, value is 0x15
+	buf = append(buf, 0x15)
 
 	//reserved 10 [00]
 	buf = append(buf, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -120,10 +123,6 @@ func (c *ClientConn) writeInitialHandshake() error {
 	buf = append(buf, c.salt[8:]...)
 
 	//filter [00]
-	buf = append(buf, 0)
-
-	//auth name
-	buf = append(buf, AUTH_NAME...)
 	buf = append(buf, 0)
 
 	return c.WritePacket(buf)
@@ -153,7 +152,7 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos += 23
 
 	//user name
-	c.user = string(buf[pos:bytes.IndexByte(buf[pos:], 0)])
+	c.user = string(buf[pos : pos+bytes.IndexByte(buf[pos:], 0)])
 	pos += len(c.user) + 1
 
 	//auth length and auth
@@ -170,18 +169,10 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos += authLen
 
 	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
-		c.db = string(buf[pos:bytes.IndexByte(buf[pos:], 0)])
+		c.db = string(buf[pos : pos+bytes.IndexByte(buf[pos:], 0)])
 		pos += len(c.db) + 1
 
-		if c.server.nodes.GetNode(c.db) == nil {
-			return NewDefaultMySQLError(ER_BAD_DB_ERROR, c.db)
-		}
-	}
-
-	//auth name
-	authName := string(buf[pos:bytes.IndexByte(buf[pos:], 0)])
-	if authName != AUTH_NAME {
-		return NewDefaultMySQLError(ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
+		//todo check db in schemas
 	}
 
 	return nil
