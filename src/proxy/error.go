@@ -5,19 +5,27 @@ import (
 )
 
 type MySQLError struct {
-	Code    uint32
+	Code    uint16
 	Message string
+	State   string
 }
 
 func (e *MySQLError) Error() string {
-	return fmt.Sprintf("%s (Error: %d)", e.Message, e.Code)
+	return fmt.Sprintf("ERROR %d (%s): %s", e.Code, e.State, e.Message)
 }
 
 //default mysql error, must adapt errname message format
-func NewDefaultMySQLError(errCode uint32, args ...interface{}) *MySQLError {
+func NewDefaultMySQLError(errCode uint16, args ...interface{}) *MySQLError {
 	e := new(MySQLError)
 	e.Code = errCode
-	if format, ok := ErrName[errCode]; ok {
+
+	if s, ok := MySQLState[errCode]; ok {
+		e.State = s
+	} else {
+		e.State = DEFAULT_MYSQL_STATE
+	}
+
+	if format, ok := MySQLErrName[errCode]; ok {
 		e.Message = fmt.Sprintf(format, args...)
 	} else {
 		e.Message = fmt.Sprint(args...)
@@ -26,6 +34,17 @@ func NewDefaultMySQLError(errCode uint32, args ...interface{}) *MySQLError {
 	return e
 }
 
-func NewMySQLError(errCode uint32, message string) *MySQLError {
-	return &MySQLError{errCode, message}
+func NewMySQLError(errCode uint16, message string) *MySQLError {
+	e := new(MySQLError)
+	e.Code = errCode
+
+	if s, ok := MySQLState[errCode]; ok {
+		e.State = s
+	} else {
+		e.State = DEFAULT_MYSQL_STATE
+	}
+
+	e.Message = message
+
+	return e
 }

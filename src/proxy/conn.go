@@ -19,6 +19,18 @@ type Conn struct {
 	sequence uint8
 }
 
+func (c *Conn) Close() error {
+	return c.conn.Close()
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *Conn) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
 func (c *Conn) ReadPacket() ([]byte, error) {
 	header := make([]byte, 4)
 
@@ -51,7 +63,7 @@ func (c *Conn) ReadPacket() ([]byte, error) {
 		}
 
 		var buf []byte
-		buf, err = c.readPacket()
+		buf, err = c.ReadPacket()
 		if err != nil {
 			log.Error("read packet error %s", err.Error())
 			return nil, err
@@ -101,4 +113,46 @@ func (c *Conn) WritePacket(data []byte) error {
 		c.sequence++
 		return nil
 	}
+}
+
+func (c *Conn) BuildOK(affectedRows uint64, lastInsertId uint64,
+	capability uint32, status uint16,
+	warning uint16, info string) []byte {
+	buf := make([]byte, 4, 32+len(info))
+
+	buf = append(buf, OK_Packet)
+
+	buf = append(buf, PutLengthEncodeInt(affectedRows)...)
+	buf = append(buf, PutLengthEncodeInt(lastInsertId)...)
+
+	if capability|CLIENT_PROTOCOL_41 > 0 {
+		buf = append(buf, byte(status), byte(status>>8))
+		buf = append(buf, byte(warning), byte(warning>>8))
+	} else if capability|CLIENT_TRANSACTIONS > 0 {
+		buf = append(buf, byte(status), byte(status>>8))
+	}
+
+	buf = append(buf, info...)
+
+	return buf
+}
+
+func (c *Conn) BuildError(e error, capability uint32) []byte {
+	var m *MySQLError
+	var ok bool
+	if m, ok = e.(*MySQLError); !ok {
+		m = NewMySQLError(ER_UNKNOWN_ERROR, e.Error())
+	}
+
+	buf := make([]byte, 4, 16+len(m.Message))
+
+	buf = append(buf, ERR_Packet)
+	buf = append(buf, byte(m.Code), byte(m.Code>>8))
+
+	buf = append(buf, '#')
+	buf = append(buf, m.State...)
+
+	buf = append(buf, m.Message...)
+
+	return buf
 }

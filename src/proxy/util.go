@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-func calcPassword(scramble, password []byte) []byte {
+func CalcPassword(scramble, password []byte) []byte {
 	if len(password) == 0 {
 		return nil
 	}
@@ -39,8 +39,62 @@ func RandomBuf(size int) ([]byte, error) {
 	buf := make([]byte, size)
 
 	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
-		return buf, err
+		return nil, err
 	}
 
-	return nil, err
+	return buf, nil
+}
+
+func LengthEncodeInt(b []byte) (num uint64, isNull bool, n int) {
+	switch b[0] {
+
+	// 251: NULL
+	case 0xfb:
+		n = 1
+		isNull = true
+		return
+
+	// 252: value of following 2
+	case 0xfc:
+		num = uint64(b[1]) | uint64(b[2])<<8
+		n = 3
+		return
+
+	// 253: value of following 3
+	case 0xfd:
+		num = uint64(b[1]) | uint64(b[2])<<8 | uint64(b[3])<<16
+		n = 4
+		return
+
+	// 254: value of following 8
+	case 0xfe:
+		num = uint64(b[1]) | uint64(b[2])<<8 | uint64(b[3])<<16 |
+			uint64(b[4])<<24 | uint64(b[5])<<32 | uint64(b[6])<<40 |
+			uint64(b[7])<<48 | uint64(b[8])<<56
+		n = 9
+		return
+	}
+
+	// 0-250: value of first byte
+	num = uint64(b[0])
+	n = 1
+	return
+}
+
+func PutLengthEncodeInt(n uint64) []byte {
+	switch {
+	case n <= 250:
+		return []byte{byte(n)}
+
+	case n <= 0xffff:
+		return []byte{0xfc, byte(n), byte(n >> 8)}
+
+	case n <= 0xffffff:
+		return []byte{0xfd, byte(n), byte(n >> 8), byte(n >> 16)}
+
+	case n <= 0xffffffffffffffff:
+		return []byte{0xfe, byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24),
+			byte(n >> 32), byte(n >> 40), byte(n >> 48), byte(n >> 56)}
+	}
+	return nil
 }

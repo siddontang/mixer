@@ -12,7 +12,11 @@ type Server struct {
 	user     string
 	password string
 
+	nodes DataNodes
+
 	running bool
+
+	listener net.Listener
 }
 
 func NewServer(cfg *Config) *Server {
@@ -24,13 +28,16 @@ func NewServer(cfg *Config) *Server {
 	s.user = cfg.ConfigServer.User
 	s.password = cfg.ConfigServer.Password
 
+	s.nodes = NewDataNodes(cfg)
+
 	return s
 }
 
 func (s *Server) Start() error {
 	log.Info("start listen %s", s.addr)
 
-	listener, err := net.Listen("tcp", s.addr)
+	var err error
+	s.listener, err = net.Listen("tcp", s.addr)
 	if err != nil {
 		log.Error("listen error %s", err.Error())
 		return err
@@ -39,7 +46,7 @@ func (s *Server) Start() error {
 	s.running = true
 
 	for s.running {
-		conn, err := listener.Accept()
+		conn, err := s.listener.Accept()
 		if err != nil {
 			log.Error("accept error %s", err.Error())
 			continue
@@ -49,10 +56,14 @@ func (s *Server) Start() error {
 	}
 
 	log.Info("stop listen")
+	return nil
 }
 
 func (s *Server) Stop() {
 	s.running = false
+	if s.listener != nil {
+		s.listener.Close()
+	}
 }
 
 func (s *Server) onConn(c net.Conn) {
@@ -60,6 +71,9 @@ func (s *Server) onConn(c net.Conn) {
 
 	if err := conn.Handshake(); err != nil {
 		log.Error("handshake error %s", err.Error())
+		c.Close()
 		return
 	}
+
+	conn.Run()
 }

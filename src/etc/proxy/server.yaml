@@ -1,5 +1,5 @@
 # proxy listen addr
-addr: 127.0.0.1:3306
+addr: 127.0.0.1:4000
 # proxy user and password, for mysql client
 user: qing
 password: admin

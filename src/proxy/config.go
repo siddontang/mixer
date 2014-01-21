@@ -18,8 +18,9 @@ type ConfigSchema struct {
 		Addr     string `yaml:"addr"`
 		User     string `yaml:"user"`
 		Password string `yaml:"password"`
+		DB       string `yaml:"db"`
 		Mode     string `yaml:"mode"`
-	} `yaml:"datanodes`
+	} `yaml:"datanodes"`
 
 	Schemas []struct {
 		Name    string   `yaml:"name"`

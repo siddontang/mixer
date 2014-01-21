@@ -1,6 +1,6 @@
 package proxy
 
-var ErrName = map[uint32]string{
+var MySQLErrName = map[uint16]string{
 	ER_HASHCHK:                                       "hashchk",
 	ER_NISAMCHK:                                      "isamchk",
 	ER_NO:                                            "NO",

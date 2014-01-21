@@ -1,10 +1,10 @@
 package proxy
 
 const (
-	DEFAULT_STATE = "HY000"
+	DEFAULT_MYSQL_STATE = "HY000"
 )
 
-var State = map[uint32]string{
+var MySQLState = map[uint16]string{
 	ER_DUP_KEY:                                  "23000",
 	ER_OUTOFMEMORY:                              "HY001",
 	ER_OUT_OF_SORTMEMORY:                        "HY001",
