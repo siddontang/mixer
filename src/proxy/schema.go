@@ -11,13 +11,13 @@ type Schema struct {
 	rw_split bool
 }
 
-func NewSchema(cfg *Config, name string, nodes []*DataNode, rw_split bool) *Schema {
+func NewSchema(cfg *Config, cfgSchema *ConfigSchema, nodes []*DataNode) *Schema {
 	s := new(Schema)
 
 	s.cfg = cfg
-	s.name = name
+	s.name = cfgSchema.Name
 	s.nodes = nodes
-	s.rw_split = rw_split
+	s.rw_split = cfgSchema.RWSplit
 
 	return s
 }
@@ -37,9 +37,9 @@ func (ss Schemas) GetSchema(name string) *Schema {
 }
 
 func NewSchemas(cfg *Config, nodes DataNodes) Schemas {
-	s := make(Schemas, len(cfg.ConfigSchema.Schemas))
+	s := make(Schemas, len(cfg.Schemas))
 
-	for _, v := range cfg.ConfigSchema.Schemas {
+	for _, v := range cfg.Schemas {
 		if len(v.Nodes) == 0 {
 			panic(fmt.Sprintf("schema %s has no node", v.Name))
 		}
@@ -53,7 +53,7 @@ func NewSchemas(cfg *Config, nodes DataNodes) Schemas {
 			}
 		}
 
-		s[v.Name] = NewSchema(cfg, v.Name, nds, v.RWSplit)
+		s[v.Name] = NewSchema(cfg, &v, nds)
 	}
 
 	return s

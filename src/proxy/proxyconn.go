@@ -15,9 +15,6 @@ var (
 //proxy <-> mysql server
 type ProxyConn struct {
 	Conn
-
-	server *Server
-
 	addr     string
 	user     string
 	password string
@@ -29,10 +26,8 @@ type ProxyConn struct {
 	salt       []byte
 }
 
-func NewProxyConn(s *Server) *ProxyConn {
+func NewProxyConn() *ProxyConn {
 	c := new(ProxyConn)
-
-	c.server = s
 
 	return c
 }
@@ -217,4 +212,52 @@ func (c *ProxyConn) readOK() (*OKPacket, error) {
 	default:
 		return nil, ErrInvalidOKPacket
 	}
+}
+
+func (c *ProxyConn) WriteCommand(command byte) error {
+	c.sequence = 0
+
+	return c.WritePacket([]byte{
+		0x01, //1 bytes long
+		0x00,
+		0x00,
+		0x00, //sequence
+		command,
+	})
+}
+
+func (c *ProxyConn) WriteCommandStr(command byte, arg string) error {
+	c.sequence = 0
+
+	length := len(arg) + 1
+
+	data := make([]byte, length+4)
+
+	data[4] = command
+
+	copy(data[5:], arg)
+
+	return c.WritePacket(data)
+}
+
+func (c *ProxyConn) WriteCommandUint32(command byte, arg uint32) error {
+	c.sequence = 0
+
+	return c.WritePacket([]byte{
+		0x05, //5 bytes long
+		0x00,
+		0x00,
+		0x00, //sequence
+
+		command,
+
+		byte(arg),
+		byte(arg >> 8),
+		byte(arg >> 16),
+		byte(arg >> 24),
+	})
+}
+
+func (c *ProxyConn) Ping() error {
+	return nil
 }

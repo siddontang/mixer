@@ -18,13 +18,18 @@ type OKPacket struct {
 	Info         string
 }
 
+type EOFPacket struct {
+	Status   uint16
+	Warnings uint16
+}
+
 func DumpOK(pkg *OKPacket, capability uint32) []byte {
 	data := make([]byte, 4, 32+len(pkg.Info))
 
 	data = append(data, OK_HEADER)
 
-	data = append(data, PutLengthEncodeInt(pkg.AffectedRows)...)
-	data = append(data, PutLengthEncodeInt(pkg.LastInsertId)...)
+	data = append(data, PutLengthEncodedInt(pkg.AffectedRows)...)
+	data = append(data, PutLengthEncodedInt(pkg.LastInsertId)...)
 
 	if capability|CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
@@ -58,6 +63,17 @@ func DumpError(e error, capability uint32) []byte {
 	return data
 }
 
+func DumpEOF(pkg *EOFPacket, capability uint32) []byte {
+	data := make([]byte, 4, 8)
+
+	if capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
+		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
+	}
+
+	return data
+}
+
 func LoadOK(data []byte, capability uint32) *OKPacket {
 	if data[0] != OK_HEADER {
 		return nil
@@ -67,9 +83,9 @@ func LoadOK(data []byte, capability uint32) *OKPacket {
 	var pos int = 1
 
 	pkg := new(OKPacket)
-	pkg.AffectedRows, _, n = LengthEncodeInt(data[pos:])
+	pkg.AffectedRows, _, n = LengthEncodedInt(data[pos:])
 	pos += n
-	pkg.LastInsertId, _, n = LengthEncodeInt(data[pos:])
+	pkg.LastInsertId, _, n = LengthEncodedInt(data[pos:])
 	pos += n
 
 	if capability&CLIENT_PROTOCOL_41 > 0 {
@@ -108,4 +124,19 @@ func LoadError(data []byte, capability uint32) *MySQLError {
 	e.Message = string(data[pos:])
 
 	return e
+}
+
+func LoadEOF(data []byte, capability uint32) *EOFPacket {
+	if data[0] != EOF_HEADER || len(data) > 5 {
+		//length encoded int may begin with 0xfe too
+		return nil
+	}
+
+	pkg := new(EOFPacket)
+	if capability&CLIENT_PROTOCOL_41 > 0 {
+		pkg.Warnings = binary.LittleEndian.Uint16(data[1:])
+		pkg.Status = binary.LittleEndian.Uint16(data[3:])
+	}
+
+	return pkg
 }

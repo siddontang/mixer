@@ -23,6 +23,9 @@ type ClientConn struct {
 	status       uint16
 	charset      byte
 
+	isAutoCommit  bool
+	isTransaction bool
+
 	user string
 	db   string
 
@@ -32,6 +35,8 @@ type ClientConn struct {
 
 	quit    chan bool
 	running bool
+
+	nodeConns map[*DataNode]*ProxyConn
 }
 
 var BaseConnectionId uint32 = 10000
@@ -47,6 +52,9 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 	conn.connectionId = atomic.AddUint32(&BaseConnectionId, 1)
 
 	conn.status = SERVER_STATUS_AUTOCOMMIT
+
+	conn.isAutoCommit = true
+	conn.isTransaction = false
 
 	conn.salt, _ = RandomBuf(20)
 

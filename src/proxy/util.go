@@ -45,7 +45,7 @@ func RandomBuf(size int) ([]byte, error) {
 	return buf, nil
 }
 
-func LengthEncodeInt(b []byte) (num uint64, isNull bool, n int) {
+func LengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
 	switch b[0] {
 
 	// 251: NULL
@@ -81,7 +81,7 @@ func LengthEncodeInt(b []byte) (num uint64, isNull bool, n int) {
 	return
 }
 
-func PutLengthEncodeInt(n uint64) []byte {
+func PutLengthEncodedInt(n uint64) []byte {
 	switch {
 	case n <= 250:
 		return []byte{byte(n)}
