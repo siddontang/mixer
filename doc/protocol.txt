@@ -1,0 +1,927 @@
+No.     Time           Source                Destination           Protocol Length Info
+   1985 53.174445000   10.20.135.213         10.20.151.142         MySQL    136    Server Greeting proto=10 version=5.5.31-log
+
+MySQL Protocol
+    Packet Length: 78
+    Packet Number: 0
+    Server Greeting
+        Protocol: 10
+        Version: 5.5.31-log
+        Thread ID: 49194
+        Salt: *X]I6oNy
+        Server Capabilities: 0xf7ff
+            .... .... .... ...1 = Long Password: Set
+            .... .... .... ..1. = Found Rows: Set
+            .... .... .... .1.. = Long Column Flags: Set
+            .... .... .... 1... = Connect With Database: Set
+            .... .... ...1 .... = Don't Allow database.table.column: Set
+            .... .... ..1. .... = Can use compression protocol: Set
+            .... .... .1.. .... = ODBC Client: Set
+            .... .... 1... .... = Can Use LOAD DATA LOCAL: Set
+            .... ...1 .... .... = Ignore Spaces before '(': Set
+            .... ..1. .... .... = Speaks 4.1 protocol (new flag): Set
+            .... .1.. .... .... = Interactive Client: Set
+            .... 0... .... .... = Switch to SSL after handshake: Not set
+            ...1 .... .... .... = Ignore sigpipes: Set
+            ..1. .... .... .... = Knows about transactions: Set
+            .1.. .... .... .... = Speaks 4.1 protocol (old flag): Set
+            1... .... .... .... = Can do 4.1 authentication: Set
+        Server Language: latin1 COLLATE latin1_swedish_ci (8)
+        Server Status: 0x0002
+            .... .... .... ...0 = In transaction: Not set
+            .... .... .... ..1. = AUTO_COMMIT: Set
+            .... .... .... .0.. = More results: Not set
+            .... .... .... 0... = Multi query - more resultsets: Not set
+            .... .... ...0 .... = Bad index used: Not set
+            .... .... ..0. .... = No index used: Not set
+            .... .... .0.. .... = Cursor exists: Not set
+            .... .... 0... .... = Last row sebd: Not set
+            .... ...0 .... .... = database dropped: Not set
+            .... ..0. .... .... = No backslash escapes: Not set
+        Unused: \017\200\025
+        Salt: 7E5vwpMqoXN[
+    Payload: 6d7973716c5f6e61746976655f70617373776f726400
+        [Expert Info (Warn/Undecoded): FIXME - dissector is incomplete]
+            [Message: FIXME - dissector is incomplete]
+            [Severity level: Warn]
+            [Group: Undecoded]
+            
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 7a 85 be 40 00 3d 06 84 2c 0a 14 87 d5 0a 14   .z..@.=..,......
+0020  97 8e 0c ea 47 4b a4 97 09 27 50 31 65 01 50 18   ....GK...'P1e.P.
+0030  00 1d b6 66 00 00 4e 00 00 00 0a 35 2e 35 2e 33   ...f..N....5.5.3
+0040  31 2d 6c 6f 67 00 2a c0 00 00 2a 58 5d 49 36 6f   1-log.*...*X]I6o
+0050  4e 79 00 ff f7 08 02 00 0f 80 15 00 00 00 00 00   Ny..............
+0060  00 00 00 00 00 37 45 35 76 77 70 4d 71 6f 58 4e   .....7E5vwpMqoXN
+0070  5b 00 6d 79 73 71 6c 5f 6e 61 74 69 76 65 5f 70   [.mysql_native_p
+0080  61 73 73 77 6f 72 64 00                           assword.
+
+No.     Time           Source                Destination           Protocol Length Info
+   1986 53.178242000   10.20.151.142         10.20.135.213         MySQL    144    Login Request user=qing db=qpush
+
+MySQL Protocol
+    Packet Length: 86
+    Packet Number: 1
+    Login Request
+        Client Capabilities: 0xa68d
+            .... .... .... ...1 = Long Password: Set
+            .... .... .... ..0. = Found Rows: Not set
+            .... .... .... .1.. = Long Column Flags: Set
+            .... .... .... 1... = Connect With Database: Set
+            .... .... ...0 .... = Don't Allow database.table.column: Not set
+            .... .... ..0. .... = Can use compression protocol: Not set
+            .... .... .0.. .... = ODBC Client: Not set
+            .... .... 1... .... = Can Use LOAD DATA LOCAL: Set
+            .... ...0 .... .... = Ignore Spaces before '(': Not set
+            .... ..1. .... .... = Speaks 4.1 protocol (new flag): Set
+            .... .1.. .... .... = Interactive Client: Set
+            .... 0... .... .... = Switch to SSL after handshake: Not set
+            ...0 .... .... .... = Ignore sigpipes: Not set
+            ..1. .... .... .... = Knows about transactions: Set
+            .0.. .... .... .... = Speaks 4.1 protocol (old flag): Not set
+            1... .... .... .... = Can do 4.1 authentication: Set
+        Extended Client Capabilities: 0x007f
+            .... .... .... ...1 = Supports multiple statements: Set
+            .... .... .... ..1. = Supports multiple results: Set
+        MAX Packet: 16777216
+        Charset: Unknown (28)
+        Username: qing
+        Password: cd8665aefc86bc63472e26ac4589aee21f18e1ee
+        Schema: qpush
+    Payload: 6d7973716c5f6e61746976655f70617373776f726400
+        [Expert Info (Warn/Undecoded): FIXME - dissector is incomplete]
+            [Message: FIXME - dissector is incomplete]
+            [Severity level: Warn]
+            [Group: Undecoded]
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 82 44 3c 40 00 40 06 00 00 0a 14 97 8e 0a 14   ..D<@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 01 a4 97 09 79 50 18   ..GK..P1e....yP.
+0030  40 14 34 00 00 00 56 00 00 01 8d a6 7f 00 00 00   @.4...V.........
+0040  00 01 1c 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0050  00 00 00 00 00 00 00 00 00 00 71 69 6e 67 00 14   ..........qing..
+0060  cd 86 65 ae fc 86 bc 63 47 2e 26 ac 45 89 ae e2   ..e....cG.&.E...
+0070  1f 18 e1 ee 71 70 75 73 68 00 6d 79 73 71 6c 5f   ....qpush.mysql_
+0080  6e 61 74 69 76 65 5f 70 61 73 73 77 6f 72 64 00   native_password.
+
+No.     Time           Source                Destination           Protocol Length Info
+   1988 53.179091000   10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 2
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 c0 40 00 3d 06 84 71 0a 14 87 d5 0a 14   .3..@.=..q......
+0020  97 8e 0c ea 47 4b a4 97 09 79 50 31 65 5b 50 18   ....GK...yP1e[P.
+0030  00 1d bd 42 00 00 07 00 00 02 00 00 00 02 00 00   ...B............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+   1989 53.179289000   10.20.151.142         10.20.135.213         MySQL    91     Request Query
+
+MySQL Protocol
+    Packet Length: 33
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: select @@version_comment limit 1
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 4d 44 3d 40 00 40 06 00 00 0a 14 97 8e 0a 14   .MD=@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 5b a4 97 09 84 50 18   ..GK..P1e[....P.
+0030  40 11 33 cb 00 00 21 00 00 00 03 73 65 6c 65 63   @.3...!....selec
+0040  74 20 40 40 76 65 72 73 69 6f 6e 5f 63 6f 6d 6d   t @@version_comm
+0050  65 6e 74 20 6c 69 6d 69 74 20 31                  ent limit 1
+
+No.     Time           Source                Destination           Protocol Length Info
+   1990 53.180241000   10.20.135.213         10.20.151.142         MySQL    144    Response
+
+MySQL Protocol
+    Packet Length: 1
+    Packet Number: 1
+    Number of fields: 1
+MySQL Protocol
+    Packet Length: 39
+    Packet Number: 2
+    Catalog: def
+    Database: 
+    Table: 
+    Original table: 
+    Name: @@version_comment
+    Original name: 
+    Charset number: latin1 COLLATE latin1_swedish_ci (8)
+    Length: 19
+    Type: FIELD_TYPE_VAR_STRING (253)
+    Flags: 0x0000
+    Decimals: 31
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 3
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+MySQL Protocol
+    Packet Length: 20
+    Packet Number: 4
+    text: Source distribution
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 5
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 82 85 c1 40 00 3d 06 84 21 0a 14 87 d5 0a 14   ....@.=..!......
+0020  97 8e 0c ea 47 4b a4 97 09 84 50 31 65 80 50 18   ....GK....P1e.P.
+0030  00 1d a8 57 00 00 01 00 00 01 01 27 00 00 02 03   ...W.......'....
+0040  64 65 66 00 00 00 11 40 40 76 65 72 73 69 6f 6e   def....@@version
+0050  5f 63 6f 6d 6d 65 6e 74 00 0c 08 00 13 00 00 00   _comment........
+0060  fd 00 00 1f 00 00 05 00 00 03 fe 00 00 02 00 14   ................
+0070  00 00 04 13 53 6f 75 72 63 65 20 64 69 73 74 72   ....Source distr
+0080  69 62 75 74 69 6f 6e 05 00 00 05 fe 00 00 02 00   ibution.........
+
+No.     Time           Source                Destination           Protocol Length Info
+  40391 1051.126318000 10.20.151.142         10.20.135.213         MySQL    76     Request Query
+
+MySQL Protocol
+    Packet Length: 18
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: SELECT DATABASE()
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 3e 13 ca 40 00 40 06 00 00 0a 14 97 8e 0a 14   .>..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 80 a4 97 09 de 50 18   ..GK..P1e.....P.
+0030  3f fb 33 bc 00 00 12 00 00 00 03 53 45 4c 45 43   ?.3........SELEC
+0040  54 20 44 41 54 41 42 41 53 45 28 29               T DATABASE()
+
+No.     Time           Source                Destination           Protocol Length Info
+  40392 1051.127397000 10.20.135.213         10.20.151.142         MySQL    123    Response
+
+MySQL Protocol
+    Packet Length: 1
+    Packet Number: 1
+    Number of fields: 1
+MySQL Protocol
+    Packet Length: 32
+    Packet Number: 2
+    Catalog: def
+    Database: 
+    Table: 
+    Original table: 
+    Name: DATABASE()
+    Original name: 
+    Charset number: latin1 COLLATE latin1_swedish_ci (8)
+    Length: 34
+    Type: FIELD_TYPE_VAR_STRING (253)
+    Flags: 0x0000
+    Decimals: 31
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 3
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+MySQL Protocol
+    Packet Length: 6
+    Packet Number: 4
+    text: qpush
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 5
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 6d 85 d1 40 00 3d 06 84 26 0a 14 87 d5 0a 14   .m..@.=..&......
+0020  97 8e 0c ea 47 4b a4 97 09 de 50 31 65 96 50 18   ....GK....P1e.P.
+0030  00 1d 94 07 00 00 01 00 00 01 01 20 00 00 02 03   ........... ....
+0040  64 65 66 00 00 00 0a 44 41 54 41 42 41 53 45 28   def....DATABASE(
+0050  29 00 0c 08 00 22 00 00 00 fd 00 00 1f 00 00 05   )...."..........
+0060  00 00 03 fe 00 00 02 00 06 00 00 04 05 71 70 75   .............qpu
+0070  73 68 05 00 00 05 fe 00 00 02 00                  sh.........
+
+No.     Time           Source                Destination           Protocol Length Info
+  40393 1051.127529000 10.20.151.142         10.20.135.213         MySQL    63     Request Use Database
+
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 0
+    Request Command Use Database
+        Command: Use Database (2)
+        Schema: test
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 31 13 cb 40 00 40 06 00 00 0a 14 97 8e 0a 14   .1..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 96 a4 97 0a 23 50 18   ..GK..P1e....#P.
+0030  3f ea 33 af 00 00 05 00 00 00 02 74 65 73 74      ?.3........test
+
+No.     Time           Source                Destination           Protocol Length Info
+  40394 1051.128358000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 d2 40 00 3d 06 84 5f 0a 14 87 d5 0a 14   .3..@.=.._......
+0020  97 8e 0c ea 47 4b a4 97 0a 23 50 31 65 9f 50 18   ....GK...#P1e.P.
+0030  00 1d bc 55 00 00 07 00 00 01 00 00 00 02 00 00   ...U............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+  40517 1053.941926000 10.20.151.142         10.20.135.213         MySQL    70     Request Query
+
+MySQL Protocol
+    Packet Length: 12
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: show tables
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 38 14 05 40 00 40 06 00 00 0a 14 97 8e 0a 14   .8..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 9f a4 97 0a 2e 50 18   ..GK..P1e.....P.
+0030  3f e7 33 b6 00 00 0c 00 00 00 03 73 68 6f 77 20   ?.3........show 
+0040  74 61 62 6c 65 73                                 tables
+
+No.     Time           Source                Destination           Protocol Length Info
+  40518 1053.943776000 10.20.135.213         10.20.151.142         MySQL    167    Response
+
+MySQL Protocol
+    Packet Length: 1
+    Packet Number: 1
+    Number of fields: 1
+MySQL Protocol
+    Packet Length: 86
+    Packet Number: 2
+    Catalog: def
+    Database: information_schema
+    Table: TABLE_NAMES
+    Original table: TABLE_NAMES
+    Name: Tables_in_test
+    Original name: TABLE_NAME
+    Charset number: latin1 COLLATE latin1_swedish_ci (8)
+    Length: 64
+    Type: FIELD_TYPE_VAR_STRING (253)
+    Flags: 0x0001
+    Decimals: 0
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 3
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0022
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..1. .... = No index used: Set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 4
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0022
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..1. .... = No index used: Set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 99 85 d3 40 00 3d 06 83 f8 0a 14 87 d5 0a 14   ....@.=.........
+0020  97 8e 0c ea 47 4b a4 97 0a 2e 50 31 65 af 50 18   ....GK....P1e.P.
+0030  00 1d 90 f9 00 00 01 00 00 01 01 56 00 00 02 03   ...........V....
+0040  64 65 66 12 69 6e 66 6f 72 6d 61 74 69 6f 6e 5f   def.information_
+0050  73 63 68 65 6d 61 0b 54 41 42 4c 45 5f 4e 41 4d   schema.TABLE_NAM
+0060  45 53 0b 54 41 42 4c 45 5f 4e 41 4d 45 53 0e 54   ES.TABLE_NAMES.T
+0070  61 62 6c 65 73 5f 69 6e 5f 74 65 73 74 0a 54 41   ables_in_test.TA
+0080  42 4c 45 5f 4e 41 4d 45 0c 08 00 40 00 00 00 fd   BLE_NAME...@....
+0090  01 00 00 00 00 05 00 00 03 fe 00 00 22 00 05 00   ............"...
+00a0  00 04 fe 00 00 22 00                              .....".
+
+No.     Time           Source                Destination           Protocol Length Info
+  41762 1087.191768000 10.20.151.142         10.20.135.213         MySQL    132    Request Query
+
+MySQL Protocol
+    Packet Length: 74
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: create table t (id int, data varchar(256), primary key(id))engine =innodb
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 76 16 8d 40 00 40 06 00 00 0a 14 97 8e 0a 14   .v..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 af a4 97 0a 9f 50 18   ..GK..P1e.....P.
+0030  3f cb 33 f4 00 00 4a 00 00 00 03 63 72 65 61 74   ?.3...J....creat
+0040  65 20 74 61 62 6c 65 20 74 20 28 69 64 20 69 6e   e table t (id in
+0050  74 2c 20 64 61 74 61 20 76 61 72 63 68 61 72 28   t, data varchar(
+0060  32 35 36 29 2c 20 70 72 69 6d 61 72 79 20 6b 65   256), primary ke
+0070  79 28 69 64 29 29 65 6e 67 69 6e 65 20 3d 69 6e   y(id))engine =in
+0080  6e 6f 64 62                                       nodb
+
+No.     Time           Source                Destination           Protocol Length Info
+  41765 1087.291638000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 d5 40 00 3d 06 84 5c 0a 14 87 d5 0a 14   .3..@.=..\......
+0020  97 8e 0c ea 47 4b a4 97 0a 9f 50 31 65 fd 50 18   ....GK....P1e.P.
+0030  00 1d bb 7b 00 00 07 00 00 01 00 00 00 02 00 00   ...{............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+  45859 1193.267508000 10.20.151.142         10.20.135.213         MySQL    64     Request Query
+
+MySQL Protocol
+    Packet Length: 6
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: begin
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 32 1f 49 40 00 40 06 00 00 0a 14 97 8e 0a 14   .2.I@.@.........
+0020  87 d5 47 4b 0c ea 50 31 65 fd a4 97 0a aa 50 18   ..GK..P1e.....P.
+0030  3f c8 33 b0 00 00 06 00 00 00 03 62 65 67 69 6e   ?.3........begin
+
+No.     Time           Source                Destination           Protocol Length Info
+  45861 1193.268223000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0003
+        .... .... .... ...1 = In transaction: Set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 d9 40 00 3d 06 84 58 0a 14 87 d5 0a 14   .3..@.=..X......
+0020  97 8e 0c ea 47 4b a4 97 0a aa 50 31 66 07 50 18   ....GK....P1f.P.
+0030  00 1d bb 65 00 00 07 00 00 01 00 00 00 03 00 00   ...e............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+  46535 1211.635729000 10.20.151.142         10.20.135.213         MySQL    99     Request Query
+
+MySQL Protocol
+    Packet Length: 41
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: insert into t(id, data) values(1, "abc")
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 55 20 c3 40 00 40 06 00 00 0a 14 97 8e 0a 14   .U .@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 07 a4 97 0a b5 50 18   ..GK..P1f.....P.
+0030  3f c5 33 d3 00 00 29 00 00 00 03 69 6e 73 65 72   ?.3...)....inser
+0040  74 20 69 6e 74 6f 20 74 28 69 64 2c 20 64 61 74   t into t(id, dat
+0050  61 29 20 76 61 6c 75 65 73 28 31 2c 20 22 61 62   a) values(1, "ab
+0060  63 22 29                                          c")
+
+No.     Time           Source                Destination           Protocol Length Info
+  46536 1211.639289000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 1
+    Server Status: 0x0003
+        .... .... .... ...1 = In transaction: Set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 da 40 00 3d 06 84 57 0a 14 87 d5 0a 14   .3..@.=..W......
+0020  97 8e 0c ea 47 4b a4 97 0a b5 50 31 66 34 50 18   ....GK....P1f4P.
+0030  00 1d bb 2c 00 00 07 00 00 01 00 01 00 03 00 00   ...,............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+  47777 1245.202824000 10.20.151.142         10.20.135.213         MySQL    74     Request Query
+
+MySQL Protocol
+    Packet Length: 16
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: select * from t
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 3c 23 6f 40 00 40 06 00 00 0a 14 97 8e 0a 14   .<#o@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 34 a4 97 0a c0 50 18   ..GK..P1f4....P.
+0030  3f c2 33 ba 00 00 10 00 00 00 03 73 65 6c 65 63   ?.3........selec
+0040  74 20 2a 20 66 72 6f 6d 20 74                     t * from t
+
+No.     Time           Source                Destination           Protocol Length Info
+  47778 1245.204007000 10.20.135.213         10.20.151.142         MySQL    163    Response
+
+MySQL Protocol
+    Packet Length: 1
+    Packet Number: 1
+    Number of fields: 2
+MySQL Protocol
+    Packet Length: 32
+    Packet Number: 2
+    Catalog: def
+    Database: test
+    Table: t
+    Original table: t
+    Name: id
+    Original name: id
+    Charset number: binary COLLATE binary (63)
+    Length: 11
+    Type: FIELD_TYPE_LONG (3)
+    Flags: 0x4003
+    Decimals: 0
+MySQL Protocol
+    Packet Length: 36
+    Packet Number: 3
+    Catalog: def
+    Database: test
+    Table: t
+    Original table: t
+    Name: data
+    Original name: data
+    Charset number: latin1 COLLATE latin1_swedish_ci (8)
+    Length: 256
+    Type: FIELD_TYPE_VAR_STRING (253)
+    Flags: 0x0000
+    Decimals: 0
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 4
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0023
+        .... .... .... ...1 = In transaction: Set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..1. .... = No index used: Set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+MySQL Protocol
+    Packet Length: 6
+    Packet Number: 5
+    text: 1
+    text: abc
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 6
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0023
+        .... .... .... ...1 = In transaction: Set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..1. .... = No index used: Set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 95 85 db 40 00 3d 06 83 f4 0a 14 87 d5 0a 14   ....@.=.........
+0020  97 8e 0c ea 47 4b a4 97 0a c0 50 31 66 48 50 18   ....GK....P1fHP.
+0030  00 1d 29 e5 00 00 01 00 00 01 02 20 00 00 02 03   ..)........ ....
+0040  64 65 66 04 74 65 73 74 01 74 01 74 02 69 64 02   def.test.t.t.id.
+0050  69 64 0c 3f 00 0b 00 00 00 03 03 40 00 00 00 24   id.?.......@...$
+0060  00 00 03 03 64 65 66 04 74 65 73 74 01 74 01 74   ....def.test.t.t
+0070  04 64 61 74 61 04 64 61 74 61 0c 08 00 00 01 00   .data.data......
+0080  00 fd 00 00 00 00 00 05 00 00 04 fe 00 00 23 00   ..............#.
+0090  06 00 00 05 01 31 03 61 62 63 05 00 00 06 fe 00   .....1.abc......
+00a0  00 23 00                                          .#.
+
+No.     Time           Source                Destination           Protocol Length Info
+  49335 1288.065885000 10.20.151.142         10.20.135.213         MySQL    65     Request Query
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: commit
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 33 26 c2 40 00 40 06 00 00 0a 14 97 8e 0a 14   .3&.@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 48 a4 97 0b 2d 50 18   ..GK..P1fH...-P.
+0030  3f a7 33 b1 00 00 07 00 00 00 03 63 6f 6d 6d 69   ?.3........commi
+0040  74                                                t
+
+No.     Time           Source                Destination           Protocol Length Info
+  49336 1288.068525000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 dd 40 00 3d 06 84 54 0a 14 87 d5 0a 14   .3..@.=..T......
+0020  97 8e 0c ea 47 4b a4 97 0b 2d 50 31 66 53 50 18   ....GK...-P1fSP.
+0030  00 1d ba 97 00 00 07 00 00 01 00 00 00 02 00 00   ................
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+  96591 2483.096047000 10.20.151.142         10.20.135.213         MySQL    108    Request Query
+
+MySQL Protocol
+    Packet Length: 50
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: PREPARE stmt1 FROM 'select * from t where id = ?'
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 5e 09 69 40 00 40 06 00 00 0a 14 97 8e 0a 14   .^.i@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 53 a4 97 0b 38 50 18   ..GK..P1fS...8P.
+0030  3f a4 33 dc 00 00 32 00 00 00 03 50 52 45 50 41   ?.3...2....PREPA
+0040  52 45 20 73 74 6d 74 31 20 46 52 4f 4d 20 27 73   RE stmt1 FROM 's
+0050  65 6c 65 63 74 20 2a 20 66 72 6f 6d 20 74 20 77   elect * from t w
+0060  68 65 72 65 20 69 64 20 3d 20 3f 27               here id = ?'
+
+No.     Time           Source                Destination           Protocol Length Info
+  96592 2483.097110000 10.20.135.213         10.20.151.142         MySQL    84     Response OK
+
+MySQL Protocol
+    Packet Length: 26
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+    Message: \022Statement prepared
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 46 85 ee 40 00 3d 06 84 30 0a 14 87 d5 0a 14   .F..@.=..0......
+0020  97 8e 0c ea 47 4b a4 97 0b 38 50 31 66 89 50 18   ....GK...8P1f.P.
+0030  00 1d 16 93 00 00 1a 00 00 01 00 00 00 02 00 00   ................
+0040  00 12 53 74 61 74 65 6d 65 6e 74 20 70 72 65 70   ..Statement prep
+0050  61 72 65 64                                       ared
+
+No.     Time           Source                Destination           Protocol Length Info
+ 101131 2604.100769000 10.20.151.142         10.20.135.213         MySQL    80     Request Query
+
+MySQL Protocol
+    Packet Length: 22
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: execute stmt1 using 1
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 42 12 c7 40 00 40 06 00 00 0a 14 97 8e 0a 14   .B..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 89 a4 97 0b 56 50 18   ..GK..P1f....VP.
+0030  3f 9d 33 c0 00 00 16 00 00 00 03 65 78 65 63 75   ?.3........execu
+0040  74 65 20 73 74 6d 74 31 20 75 73 69 6e 67 20 31   te stmt1 using 1
+
+No.     Time           Source                Destination           Protocol Length Info
+ 101134 2604.101657000 10.20.135.213         10.20.151.142         MySQL    214    Response Error 1064
+
+MySQL Protocol
+    Packet Length: 156
+    Packet Number: 1
+    Error Code: 1064
+    SQL state: 42000
+    Error message: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '1' at line 1
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 c8 85 f0 40 00 3d 06 83 ac 0a 14 87 d5 0a 14   ....@.=.........
+0020  97 8e 0c ea 47 4b a4 97 0b 56 50 31 66 a3 50 18   ....GK...VP1f.P.
+0030  00 1d 6e 7f 00 00 9c 00 00 01 ff 28 04 23 34 32   ..n........(.#42
+0040  30 30 30 59 6f 75 20 68 61 76 65 20 61 6e 20 65   000You have an e
+0050  72 72 6f 72 20 69 6e 20 79 6f 75 72 20 53 51 4c   rror in your SQL
+0060  20 73 79 6e 74 61 78 3b 20 63 68 65 63 6b 20 74    syntax; check t
+0070  68 65 20 6d 61 6e 75 61 6c 20 74 68 61 74 20 63   he manual that c
+0080  6f 72 72 65 73 70 6f 6e 64 73 20 74 6f 20 79 6f   orresponds to yo
+0090  75 72 20 4d 79 53 51 4c 20 73 65 72 76 65 72 20   ur MySQL server 
+00a0  76 65 72 73 69 6f 6e 20 66 6f 72 20 74 68 65 20   version for the 
+00b0  72 69 67 68 74 20 73 79 6e 74 61 78 20 74 6f 20   right syntax to 
+00c0  75 73 65 20 6e 65 61 72 20 27 31 27 20 61 74 20   use near '1' at 
+00d0  6c 69 6e 65 20 31                                 line 1
+
+No.     Time           Source                Destination           Protocol Length Info
+ 102487 2631.764599000 10.20.151.142         10.20.135.213         MySQL    69     Request Query
+
+MySQL Protocol
+    Packet Length: 11
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: set @a = 1
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 37 15 89 40 00 40 06 00 00 0a 14 97 8e 0a 14   .7..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 a3 a4 97 0b f6 50 18   ..GK..P1f.....P.
+0030  3f 75 33 b5 00 00 0b 00 00 00 03 73 65 74 20 40   ?u3........set @
+0040  61 20 3d 20 31                                    a = 1
+
+No.     Time           Source                Destination           Protocol Length Info
+ 102488 2631.765660000 10.20.135.213         10.20.151.142         MySQL    65     Response OK
+
+MySQL Protocol
+    Packet Length: 7
+    Packet Number: 1
+    Affected Rows: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+    Warnings: 0
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 33 85 f2 40 00 3d 06 84 3f 0a 14 87 d5 0a 14   .3..@.=..?......
+0020  97 8e 0c ea 47 4b a4 97 0b f6 50 31 66 b2 50 18   ....GK....P1f.P.
+0030  00 1d b9 6f 00 00 07 00 00 01 00 00 00 02 00 00   ...o............
+0040  00                                                .
+
+No.     Time           Source                Destination           Protocol Length Info
+ 102620 2635.940846000 10.20.151.142         10.20.135.213         MySQL    81     Request Query
+
+MySQL Protocol
+    Packet Length: 23
+    Packet Number: 0
+    Request Command Query
+        Command: Query (3)
+        Statement: execute stmt1 using @a
+
+0000  00 0f e2 c7 64 e4 90 b1 1c 95 0e a1 08 00 45 00   ....d.........E.
+0010  00 43 15 cf 40 00 40 06 00 00 0a 14 97 8e 0a 14   .C..@.@.........
+0020  87 d5 47 4b 0c ea 50 31 66 b2 a4 97 0c 01 50 18   ..GK..P1f.....P.
+0030  3f 72 33 c1 00 00 17 00 00 00 03 65 78 65 63 75   ?r3........execu
+0040  74 65 20 73 74 6d 74 31 20 75 73 69 6e 67 20 40   te stmt1 using @
+0050  61                                                a
+
+No.     Time           Source                Destination           Protocol Length Info
+ 102621 2635.942265000 10.20.135.213         10.20.151.142         MySQL    163    Response
+
+MySQL Protocol
+    Packet Length: 1
+    Packet Number: 1
+    Number of fields: 2
+MySQL Protocol
+    Packet Length: 32
+    Packet Number: 2
+    Catalog: def
+    Database: test
+    Table: t
+    Original table: t
+    Name: id
+    Original name: id
+    Charset number: binary COLLATE binary (63)
+    Length: 11
+    Type: FIELD_TYPE_LONG (3)
+    Flags: 0x4003
+    Decimals: 0
+MySQL Protocol
+    Packet Length: 36
+    Packet Number: 3
+    Catalog: def
+    Database: test
+    Table: t
+    Original table: t
+    Name: data
+    Original name: data
+    Charset number: latin1 COLLATE latin1_swedish_ci (8)
+    Length: 256
+    Type: FIELD_TYPE_VAR_STRING (253)
+    Flags: 0x0000
+    Decimals: 0
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 4
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+MySQL Protocol
+    Packet Length: 6
+    Packet Number: 5
+    text: 1
+    text: abc
+MySQL Protocol
+    Packet Length: 5
+    Packet Number: 6
+    EOF marker: 254
+    Warnings: 0
+    Server Status: 0x0002
+        .... .... .... ...0 = In transaction: Not set
+        .... .... .... ..1. = AUTO_COMMIT: Set
+        .... .... .... .0.. = More results: Not set
+        .... .... .... 0... = Multi query - more resultsets: Not set
+        .... .... ...0 .... = Bad index used: Not set
+        .... .... ..0. .... = No index used: Not set
+        .... .... .0.. .... = Cursor exists: Not set
+        .... .... 0... .... = Last row sebd: Not set
+        .... ...0 .... .... = database dropped: Not set
+        .... ..0. .... .... = No backslash escapes: Not set
+
+0000  90 b1 1c 95 0e a1 00 0f e2 e9 63 82 08 00 45 08   ..........c...E.
+0010  00 95 85 f3 40 00 3d 06 83 dc 0a 14 87 d5 0a 14   ....@.=.........
+0020  97 8e 0c ea 47 4b a4 97 0c 01 50 31 66 cd 50 18   ....GK....P1f.P.
+0030  00 1d 49 40 00 00 01 00 00 01 02 20 00 00 02 03   ..I@....... ....
+0040  64 65 66 04 74 65 73 74 01 74 01 74 02 69 64 02   def.test.t.t.id.
+0050  69 64 0c 3f 00 0b 00 00 00 03 03 40 00 00 00 24   id.?.......@...$
+0060  00 00 03 03 64 65 66 04 74 65 73 74 01 74 01 74   ....def.test.t.t
+0070  04 64 61 74 61 04 64 61 74 61 0c 08 00 00 01 00   .data.data......
+0080  00 fd 00 00 00 00 00 05 00 00 04 fe 00 00 02 00   ................
+0090  06 00 00 05 01 31 03 61 62 63 05 00 00 06 fe 00   .....1.abc......
+00a0  00 02 00                                          ...
