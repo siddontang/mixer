@@ -12,7 +12,8 @@ type Server struct {
 	user     string
 	password string
 
-	nodes DataNodes
+	nodes   DataNodes
+	schemas Schemas
 
 	running bool
 
@@ -29,6 +30,7 @@ func NewServer(cfg *Config) *Server {
 	s.password = cfg.ConfigServer.Password
 
 	s.nodes = NewDataNodes(cfg)
+	s.schemas = NewSchemas(cfg, s.nodes)
 
 	return s
 }

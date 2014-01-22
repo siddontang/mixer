@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 )
 
-var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS | CLIENT_LONG_FLAG |
-	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
-	CLIENT_INTERACTIVE | CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS | CLIENT_PS_MULTI_RESULTS
+var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG |
+	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
+	CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
 
 //client <-> proxy
 type ClientConn struct {
@@ -66,12 +66,12 @@ func (c *ClientConn) Handshake() error {
 	if err := c.readHandshakeResponse(); err != nil {
 		log.Error("recv handshake response error %s", err.Error())
 
-		c.WritePacket(c.BuildError(err, c.capability))
+		c.WritePacket(DumpError(err, c.capability))
 
 		return err
 	}
 
-	if err := c.WritePacket(c.BuildOK(0, 0, c.capability, c.status, 0, "")); err != nil {
+	if err := c.WritePacket(DumpOK(&OKPacket{0, 0, c.status, 0, ""}, c.capability)); err != nil {
 		log.Error("write ok fail %s", err.Error())
 		return err
 	}
@@ -82,54 +82,54 @@ func (c *ClientConn) Handshake() error {
 }
 
 func (c *ClientConn) writeInitialHandshake() error {
-	buf := make([]byte, 4, 128)
+	data := make([]byte, 4, 128)
 
 	//min version 10
-	buf = append(buf, 10)
+	data = append(data, 10)
 
 	//server version[00]
-	buf = append(buf, ServerVersion...)
-	buf = append(buf, 0)
+	data = append(data, ServerVersion...)
+	data = append(data, 0)
 
 	//connection id
-	buf = append(buf, byte(c.connectionId), byte(c.connectionId>>8), byte(c.connectionId>>16), byte(c.connectionId>>24))
+	data = append(data, byte(c.connectionId), byte(c.connectionId>>8), byte(c.connectionId>>16), byte(c.connectionId>>24))
 
 	//auth-plugin-data-part-1
-	buf = append(buf, c.salt[0:8]...)
+	data = append(data, c.salt[0:8]...)
 
 	//filter [00]
-	buf = append(buf, 0)
+	data = append(data, 0)
 
 	//capability flag lower 2 bytes, using default capability here
-	buf = append(buf, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
+	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	buf = append(buf, DEFAULT_UTF8_CHARSET)
+	data = append(data, DEFAULT_UTF8_CHARSET)
 
 	//status
-	buf = append(buf, byte(c.status), byte(c.status>>8))
+	data = append(data, byte(c.status), byte(c.status>>8))
 
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
-	buf = append(buf, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
+	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
 
 	//filter [0x15], for wireshark dump, value is 0x15
-	buf = append(buf, 0x15)
+	data = append(data, 0x15)
 
 	//reserved 10 [00]
-	buf = append(buf, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+	data = append(data, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 	//auth-plugin-data-part-2
-	buf = append(buf, c.salt[8:]...)
+	data = append(data, c.salt[8:]...)
 
 	//filter [00]
-	buf = append(buf, 0)
+	data = append(data, 0)
 
-	return c.WritePacket(buf)
+	return c.WritePacket(data)
 }
 
 func (c *ClientConn) readHandshakeResponse() error {
-	buf, err := c.ReadPacket()
+	data, err := c.ReadPacket()
 
 	if err != nil {
 		return err
@@ -138,27 +138,27 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos := 0
 
 	//capability
-	c.capability = binary.LittleEndian.Uint32(buf[:4])
+	c.capability = binary.LittleEndian.Uint32(data[:4])
 	pos += 4
 
 	//skip max packet size
 	pos += 4
 
 	//charset
-	c.charset = buf[pos]
+	c.charset = data[pos]
 	pos++
 
 	//skip reserved 23[00]
 	pos += 23
 
 	//user name
-	c.user = string(buf[pos : pos+bytes.IndexByte(buf[pos:], 0)])
+	c.user = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 	pos += len(c.user) + 1
 
 	//auth length and auth
-	authLen := int(buf[pos])
+	authLen := int(data[pos])
 	pos++
-	auth := buf[pos : pos+authLen]
+	auth := data[pos : pos+authLen]
 
 	checkAuth := CalcPassword(c.salt, []byte(c.server.cfg.Password))
 
@@ -169,10 +169,13 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos += authLen
 
 	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
-		c.db = string(buf[pos : pos+bytes.IndexByte(buf[pos:], 0)])
+		c.db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 
 		//todo check db in schemas
+		if c.server.schemas.GetSchema(c.db) == nil {
+			return NewDefaultMySQLError(ER_BAD_DB_ERROR, c.db)
+		}
 	}
 
 	return nil
@@ -190,19 +193,19 @@ func (c *ClientConn) Run() {
 	close(c.quit)
 }
 
-func (c *ClientConn) handleReadPacket(buf []byte) error {
+func (c *ClientConn) handleReadPacket(data []byte) error {
 	return nil
 }
 
 func (c *ClientConn) onRead() {
 	for {
-		buf, err := c.ReadPacket()
+		data, err := c.ReadPacket()
 		if err != nil {
 			log.Error("read packet error %s", err.Error())
 			return
 		}
 
-		if err := c.handleReadPacket(buf); err != nil {
+		if err := c.handleReadPacket(data); err != nil {
 
 		}
 	}

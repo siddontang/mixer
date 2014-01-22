@@ -8,10 +8,10 @@ const (
 )
 
 const (
-	OK_Packet          byte = 0x00
-	ERR_Packet         byte = 0xff
-	EOF_Packet         byte = 0xfe
-	LocalInFile_Packet byte = 0xfb
+	OK_HEADER          byte = 0x00
+	ERR_HEADER         byte = 0xff
+	EOF_HEADER         byte = 0xfe
+	LocalInFile_HEADER byte = 0xfb
 )
 
 const (
