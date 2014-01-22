@@ -58,13 +58,14 @@ func DumpError(e error, capability uint32) []byte {
 	return data
 }
 
-func LoadOK(data []byte, capability uint32) (*OKPacket, error) {
+func LoadOK(data []byte, capability uint32) *OKPacket {
 	if data[0] != OK_HEADER {
-		return nil, ErrInvalidOKPacket
+		return nil
 	}
 
 	var n int
 	var pos int = 1
+
 	pkg := new(OKPacket)
 	pkg.AffectedRows, _, n = LengthEncodeInt(data[pos:])
 	pos += n
@@ -82,12 +83,12 @@ func LoadOK(data []byte, capability uint32) (*OKPacket, error) {
 	}
 
 	pkg.Info = string(data[pos:])
-	return pkg, nil
+	return pkg
 }
 
-func LoadError(data []byte, capability uint32) (*MySQLError, error) {
+func LoadError(data []byte, capability uint32) *MySQLError {
 	if data[0] != ERR_HEADER {
-		return nil, ErrInvalidErrPacket
+		return nil
 	}
 
 	e := new(MySQLError)
@@ -106,5 +107,5 @@ func LoadError(data []byte, capability uint32) (*MySQLError, error) {
 
 	e.Message = string(data[pos:])
 
-	return e, nil
+	return e
 }

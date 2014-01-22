@@ -135,15 +135,10 @@ func (c *ProxyConn) readInitialHandshake() error {
 
 func (c *ProxyConn) writeAuthHandshake() error {
 	// Adjust client capability flags based on server support
-	capability := uint32(
-		CLIENT_PROTOCOL_41 |
-			CLIENT_SECURE_CONNECTION |
-			CLIENT_LONG_PASSWORD |
-			CLIENT_TRANSACTIONS)
+	capability := CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION |
+		CLIENT_LONG_PASSWORD | CLIENT_TRANSACTIONS | CLIENT_LONG_FLAG
 
-	if (c.capability & CLIENT_LONG_FLAG) != 0 {
-		capability |= CLIENT_LONG_FLAG
-	}
+	capability &= c.capability
 
 	//packet length
 	//capbility 4
@@ -214,5 +209,12 @@ func (c *ProxyConn) readOK() (*OKPacket, error) {
 		return nil, err
 	}
 
-	return LoadOK(data, c.capability)
+	switch data[0] {
+	case OK_HEADER:
+		return LoadOK(data, c.capability), nil
+	case ERR_HEADER:
+		return nil, LoadError(data, c.capability)
+	default:
+		return nil, ErrInvalidOKPacket
+	}
 }
