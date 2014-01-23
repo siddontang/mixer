@@ -5,16 +5,18 @@ import (
 )
 
 type Schema struct {
+	server   *Server
 	cfg      *Config
 	name     string
 	nodes    []*DataNode
 	rw_split bool
 }
 
-func NewSchema(cfg *Config, cfgSchema *ConfigSchema, nodes []*DataNode) *Schema {
+func NewSchema(server *Server, cfgSchema *ConfigSchema, nodes []*DataNode) *Schema {
 	s := new(Schema)
 
-	s.cfg = cfg
+	s.server = server
+	s.cfg = server.cfg
 	s.name = cfgSchema.Name
 	s.nodes = nodes
 	s.rw_split = cfgSchema.RWSplit
@@ -22,8 +24,15 @@ func NewSchema(cfg *Config, cfgSchema *ConfigSchema, nodes []*DataNode) *Schema 
 	return s
 }
 
-func (s *Schema) SelectNode(sql string) *DataNode {
-	return nil
+//return a map key is datanode and value is the query the datanode will run
+func (s *Schema) Route(query []byte) (map[*DataNode][]byte, error) {
+	//todo
+	//1, parse query with rule
+	//2, rebuild query to send different datanode
+
+	//now we only return first datanode
+
+	return map[*DataNode][]byte{s.nodes[0]: query}, nil
 }
 
 type Schemas map[string]*Schema
@@ -36,7 +45,9 @@ func (ss Schemas) GetSchema(name string) *Schema {
 	}
 }
 
-func NewSchemas(cfg *Config, nodes DataNodes) Schemas {
+func NewSchemas(server *Server, nodes DataNodes) Schemas {
+	cfg := server.cfg
+
 	s := make(Schemas, len(cfg.Schemas))
 
 	for _, v := range cfg.Schemas {
@@ -53,7 +64,7 @@ func NewSchemas(cfg *Config, nodes DataNodes) Schemas {
 			}
 		}
 
-		s[v.Name] = NewSchema(cfg, &v, nds)
+		s[v.Name] = NewSchema(server, &v, nds)
 	}
 
 	return s

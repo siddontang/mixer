@@ -395,7 +395,7 @@ func (c *Client) readTextResultSetColumns(count uint64) (columns [][]byte, err e
 		}
 
 		// EOF Packet
-		if data[0] == EOF_Packet && len(data) < 9 {
+		if data[0] == EOF_Packet && len(data) <= 5 {
 			if i != count {
 				log.Error("ColumnsCount mismatch n:%d len:%d", count, len(columns))
 				err = ErrMismatchColumns
@@ -422,7 +422,7 @@ func (c *Client) readTextResultSetRows() (rows [][]byte, err error) {
 		}
 
 		// EOF Packet
-		if data[0] == EOF_Packet && len(data) < 9 {
+		if data[0] == EOF_Packet && len(data) <= 5 {
 			return
 		}
 

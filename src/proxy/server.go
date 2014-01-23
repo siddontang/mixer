@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"github.com/siddontang/golib/log"
+	"github.com/siddontang/golib/timingwheel"
 	"net"
+	"time"
 )
 
 type Server struct {
@@ -18,6 +20,8 @@ type Server struct {
 	running bool
 
 	listener net.Listener
+
+	timer *timingwheel.TimingWheel
 }
 
 func NewServer(cfg *Config) *Server {
@@ -29,8 +33,10 @@ func NewServer(cfg *Config) *Server {
 	s.user = cfg.ConfigServer.User
 	s.password = cfg.ConfigServer.Password
 
-	s.nodes = NewDataNodes(cfg)
-	s.schemas = NewSchemas(cfg, s.nodes)
+	s.nodes = NewDataNodes(s)
+	s.schemas = NewSchemas(s, s.nodes)
+
+	s.timer = timingwheel.NewTimingWheel(time.Second, 3600)
 
 	return s
 }
@@ -78,4 +84,6 @@ func (s *Server) onConn(c net.Conn) {
 	}
 
 	conn.Run()
+
+	conn.Close()
 }

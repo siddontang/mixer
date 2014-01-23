@@ -6,10 +6,13 @@ import (
 	"errors"
 	"github.com/siddontang/golib/log"
 	"net"
+	"time"
 )
 
 var (
+	PingPeriod         = int64(time.Second * 60)
 	ErrProtocolVersion = errors.New("invalid protocol version, only support >= 10")
+	ErrLocalInFile     = errors.New("not support for local in file")
 )
 
 //proxy <-> mysql server
@@ -20,10 +23,11 @@ type ProxyConn struct {
 	password string
 	db       string
 
-	capability uint32
-	status     uint16
-	charset    byte
-	salt       []byte
+	status  uint16
+	charset byte
+	salt    []byte
+
+	lastPing int64
 }
 
 func NewProxyConn() *ProxyConn {
@@ -65,10 +69,18 @@ func (c *ProxyConn) ReConnect() error {
 		return err
 	}
 
-	if _, err := c.readOK(); err != nil {
+	if _, err := c.ReadOK(); err != nil {
 		log.Error("read ok error %s", err.Error())
 		return err
 	}
+
+	//we must always use autocommit
+	if _, err := c.Exec("set autocommit = 1"); err != nil {
+		log.Error("set autocommit error %s", err.Error())
+		return err
+	}
+
+	c.lastPing = time.Now().Unix()
 
 	return nil
 }
@@ -198,22 +210,6 @@ func (c *ProxyConn) writeAuthHandshake() error {
 	return c.WritePacket(data)
 }
 
-func (c *ProxyConn) readOK() (*OKPacket, error) {
-	data, err := c.ReadPacket()
-	if err != nil {
-		return nil, err
-	}
-
-	switch data[0] {
-	case OK_HEADER:
-		return LoadOK(data, c.capability), nil
-	case ERR_HEADER:
-		return nil, LoadError(data, c.capability)
-	default:
-		return nil, ErrInvalidOKPacket
-	}
-}
-
 func (c *ProxyConn) WriteCommand(command byte) error {
 	c.sequence = 0
 
@@ -224,6 +220,20 @@ func (c *ProxyConn) WriteCommand(command byte) error {
 		0x00, //sequence
 		command,
 	})
+}
+
+func (c *ProxyConn) WriteCommandBuf(command byte, arg []byte) error {
+	c.sequence = 0
+
+	length := len(arg) + 1
+
+	data := make([]byte, length+4)
+
+	data[4] = command
+
+	copy(data[5:], arg)
+
+	return c.WritePacket(data)
 }
 
 func (c *ProxyConn) WriteCommandStr(command byte, arg string) error {
@@ -259,5 +269,120 @@ func (c *ProxyConn) WriteCommandUint32(command byte, arg uint32) error {
 }
 
 func (c *ProxyConn) Ping() error {
+	n := time.Now().Unix()
+
+	if n-c.lastPing > PingPeriod {
+		if err := c.WriteCommand(COM_PING); err != nil {
+			return err
+		}
+
+		if _, err := c.ReadOK(); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (c *ProxyConn) Exec(command string) (*OKPacket, error) {
+	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
+		return nil, err
+	}
+
+	return c.ReadOK()
+}
+
+func (c *ProxyConn) Begin() (*OKPacket, error) {
+	return c.Exec("begin")
+}
+
+func (c *ProxyConn) Commit() (*OKPacket, error) {
+	return c.Exec("commit")
+}
+
+func (c *ProxyConn) Rollback() (*OKPacket, error) {
+	return c.Exec("rollback")
+}
+
+func (c *ProxyConn) ReadTextResult() (*TextResultPacket, error) {
+	data, err := c.ReadPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	switch data[0] {
+	case OK_HEADER:
+		return nil, ErrMalformPacket
+	case ERR_HEADER:
+		return nil, c.LoadError(data)
+	case LocalInFile_HEADER:
+		return nil, ErrLocalInFile
+	}
+
+	result := new(TextResultPacket)
+
+	// column count
+	count, _, n := LengthEncodedInt(data)
+
+	if n-len(data) != 0 {
+		return nil, ErrMalformPacket
+	}
+
+	result.ColumnDefs = make([][]byte, count)
+
+	if err = c.readTextResultColumns(result); err != nil {
+		return nil, err
+	}
+
+	if err = c.readTextResultRows(result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *ProxyConn) readTextResultColumns(result *TextResultPacket) (err error) {
+	var i int = 0
+	var data []byte
+
+	for {
+		data, err = c.ReadPacket()
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			if i != len(result.ColumnDefs) {
+				log.Error("ColumnsCount mismatch n:%d len:%d", i, len(result.ColumnDefs))
+				err = ErrMalformPacket
+			}
+			return
+		}
+
+		result.ColumnDefs[i] = data
+
+		i++
+	}
+}
+
+func (c *ProxyConn) readTextResultRows(result *TextResultPacket) (err error) {
+	var data []byte
+
+	result.Rows = make([][]byte, 0)
+
+	for {
+		data, err = c.ReadPacket()
+
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			return
+		}
+
+		result.Rows = append(result.Rows, data)
+	}
 }

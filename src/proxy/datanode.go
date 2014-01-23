@@ -5,6 +5,7 @@ import (
 	"github.com/siddontang/golib/log"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -13,7 +14,8 @@ const (
 )
 
 type DataNode struct {
-	cfg *Config
+	server *Server
+	cfg    *Config
 
 	name     string
 	addr     string
@@ -30,17 +32,19 @@ type DataNode struct {
 	alive bool
 }
 
-func NewDataNode(cfg *Config, cfgNode *ConfigDataNode) *DataNode {
+func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	dn := new(DataNode)
 
-	dn.cfg = cfg
+	dn.server = server
+	dn.cfg = server.cfg
+
 	dn.name = cfgNode.Name
 	dn.addr = cfgNode.Addr
 	dn.user = cfgNode.User
 	dn.password = cfgNode.Password
 	dn.db = cfgNode.DB
 
-	dn.maxIdleConns = cfg.MaxIdleConns
+	dn.maxIdleConns = server.cfg.MaxIdleConns
 
 	dn.conns = list.New()
 
@@ -87,15 +91,23 @@ func (dn *DataNode) PopConn() (*ProxyConn, error) {
 }
 
 func (dn *DataNode) PushConn(c *ProxyConn) {
+	var closeConn *ProxyConn
 	dn.lock.Lock()
 
 	if dn.conns.Len() > dn.maxIdleConns {
-		dn.conns.Remove(dn.conns.Front())
+		oldConn := dn.conns.Front()
+		dn.conns.Remove(oldConn)
+
+		closeConn = oldConn.Value.(*ProxyConn)
 	}
 
 	dn.conns.PushBack(c)
 
 	dn.lock.Unlock()
+
+	if closeConn != nil {
+		closeConn.Close()
+	}
 }
 
 func (dn *DataNode) run() {
@@ -104,6 +116,35 @@ func (dn *DataNode) run() {
 	//to do
 	//1 check connection alive
 	//2 check remove mysql server alive
+
+	var errNum int = 0
+
+	t := time.NewTicker(3 * time.Second)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			if c, err := dn.PopConn(); err != nil {
+				log.Error("pop conn error %s", err.Error())
+				errNum++
+			} else {
+				if err := c.Ping(); err != nil {
+					log.Error("ping error %s", err.Error())
+					errNum++
+				} else {
+					errNum = 0
+					dn.alive = true
+					dn.PushConn(c)
+				}
+			}
+
+			if errNum > 3 {
+				log.Error("check alive 3 failed, disable alive")
+				dn.alive = false
+			}
+		}
+	}
 }
 
 func (dn *DataNode) IsAlive() bool {
@@ -120,11 +161,13 @@ func (dns DataNodes) GetNode(name string) *DataNode {
 	}
 }
 
-func NewDataNodes(cfg *Config) DataNodes {
+func NewDataNodes(server *Server) DataNodes {
+	cfg := server.cfg
+
 	dns := make(DataNodes, len(cfg.DataNodes))
 
 	for _, v := range cfg.DataNodes {
-		dns[v.Name] = NewDataNode(cfg, &v)
+		dns[v.Name] = NewDataNode(server, &v)
 	}
 
 	return dns

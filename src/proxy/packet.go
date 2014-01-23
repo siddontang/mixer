@@ -1,15 +1,5 @@
 package proxy
 
-import (
-	"encoding/binary"
-	"errors"
-)
-
-var (
-	ErrInvalidOKPacket  = errors.New("packet is not an ok packet")
-	ErrInvalidErrPacket = errors.New("packet is not an error packet")
-)
-
 type OKPacket struct {
 	AffectedRows uint64
 	LastInsertId uint64
@@ -23,120 +13,24 @@ type EOFPacket struct {
 	Warnings uint16
 }
 
-func DumpOK(pkg *OKPacket, capability uint32) []byte {
-	data := make([]byte, 4, 32+len(pkg.Info))
+type ColumnDefPacket struct {
+	Schema   string
+	Table    string
+	OrgTable string
+	Name     string
+	OrgName  string
+	Charset  uint16
+	Length   uint32
+	Type     uint8
+	Flag     uint16
+	Decimals uint8
 
-	data = append(data, OK_HEADER)
-
-	data = append(data, PutLengthEncodedInt(pkg.AffectedRows)...)
-	data = append(data, PutLengthEncodedInt(pkg.LastInsertId)...)
-
-	if capability|CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
-		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
-	} else if capability|CLIENT_TRANSACTIONS > 0 {
-		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
-	}
-
-	data = append(data, pkg.Info...)
-
-	return data
+	//below if command was COM_FIELD_LIST
+	DefaultLen   uint64
+	DefaultValue string
 }
 
-func DumpError(e error, capability uint32) []byte {
-	var m *MySQLError
-	var ok bool
-	if m, ok = e.(*MySQLError); !ok {
-		m = NewMySQLError(ER_UNKNOWN_ERROR, e.Error())
-	}
-
-	data := make([]byte, 4, 16+len(m.Message))
-
-	data = append(data, ERR_HEADER)
-	data = append(data, byte(m.Code), byte(m.Code>>8))
-
-	data = append(data, '#')
-	data = append(data, m.State...)
-
-	data = append(data, m.Message...)
-
-	return data
-}
-
-func DumpEOF(pkg *EOFPacket, capability uint32) []byte {
-	data := make([]byte, 4, 8)
-
-	if capability&CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
-		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
-	}
-
-	return data
-}
-
-func LoadOK(data []byte, capability uint32) *OKPacket {
-	if data[0] != OK_HEADER {
-		return nil
-	}
-
-	var n int
-	var pos int = 1
-
-	pkg := new(OKPacket)
-	pkg.AffectedRows, _, n = LengthEncodedInt(data[pos:])
-	pos += n
-	pkg.LastInsertId, _, n = LengthEncodedInt(data[pos:])
-	pos += n
-
-	if capability&CLIENT_PROTOCOL_41 > 0 {
-		pkg.Status = binary.LittleEndian.Uint16(data[pos:])
-		pos += 2
-		pkg.Warnings = binary.LittleEndian.Uint16(data[pos:])
-		pos += 2
-	} else if capability&CLIENT_TRANSACTIONS > 0 {
-		pkg.Status = binary.LittleEndian.Uint16(data[pos:])
-		pos += 2
-	}
-
-	pkg.Info = string(data[pos:])
-	return pkg
-}
-
-func LoadError(data []byte, capability uint32) *MySQLError {
-	if data[0] != ERR_HEADER {
-		return nil
-	}
-
-	e := new(MySQLError)
-
-	var pos int = 1
-
-	e.Code = binary.LittleEndian.Uint16(data[pos:])
-	pos += 2
-
-	if capability&CLIENT_PROTOCOL_41 > 0 {
-		//skip '#'
-		pos++
-		e.State = string(data[pos : pos+5])
-		pos += 5
-	}
-
-	e.Message = string(data[pos:])
-
-	return e
-}
-
-func LoadEOF(data []byte, capability uint32) *EOFPacket {
-	if data[0] != EOF_HEADER || len(data) > 5 {
-		//length encoded int may begin with 0xfe too
-		return nil
-	}
-
-	pkg := new(EOFPacket)
-	if capability&CLIENT_PROTOCOL_41 > 0 {
-		pkg.Warnings = binary.LittleEndian.Uint16(data[1:])
-		pkg.Status = binary.LittleEndian.Uint16(data[3:])
-	}
-
-	return pkg
+type TextResultPacket struct {
+	ColumnDefs [][]byte
+	Rows       [][]byte
 }

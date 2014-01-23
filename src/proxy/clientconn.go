@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"github.com/siddontang/golib/log"
 	"net"
 	"sync/atomic"
@@ -19,22 +20,16 @@ type ClientConn struct {
 	server *Server
 
 	connectionId uint32
-	capability   uint32
-	status       uint16
-	charset      byte
 
-	isAutoCommit  bool
-	isTransaction bool
+	status  uint16
+	charset byte
 
 	user string
 	db   string
 
 	salt []byte
 
-	msgs chan []byte
-
-	quit    chan bool
-	running bool
+	schema *Schema
 
 	nodeConns map[*DataNode]*ProxyConn
 }
@@ -53,14 +48,9 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 	conn.status = SERVER_STATUS_AUTOCOMMIT
 
-	conn.isAutoCommit = true
-	conn.isTransaction = false
-
 	conn.salt, _ = RandomBuf(20)
 
-	conn.quit = make(chan bool)
-
-	conn.msgs = make(chan []byte, 4)
+	conn.nodeConns = make(map[*DataNode]*ProxyConn)
 
 	return conn
 }
@@ -74,12 +64,12 @@ func (c *ClientConn) Handshake() error {
 	if err := c.readHandshakeResponse(); err != nil {
 		log.Error("recv handshake response error %s", err.Error())
 
-		c.WritePacket(DumpError(err, c.capability))
+		c.WriteError(err)
 
 		return err
 	}
 
-	if err := c.WritePacket(DumpOK(&OKPacket{0, 0, c.status, 0, ""}, c.capability)); err != nil {
+	if err := c.WriteOK(&OKPacket{0, 0, c.status, 0, ""}); err != nil {
 		log.Error("write ok fail %s", err.Error())
 		return err
 	}
@@ -87,6 +77,27 @@ func (c *ClientConn) Handshake() error {
 	c.sequence = 0
 
 	return nil
+}
+
+func (c *ClientConn) Close() error {
+	c.conn.Close()
+
+	//connection closed but proxy connection may be in trans, cancel
+	for node, conn := range c.nodeConns {
+		if _, err := conn.Rollback(); err != nil {
+			log.Error("node %s rollback error %s", node.name, err.Error())
+		}
+	}
+
+	c.clearNodeConns()
+	return nil
+}
+
+func (c *ClientConn) clearNodeConns() {
+	for n, v := range c.nodeConns {
+		n.PushConn(v)
+		delete(c.nodeConns, n)
+	}
 }
 
 func (c *ClientConn) writeInitialHandshake() error {
@@ -177,12 +188,11 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos += authLen
 
 	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
-		c.db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
+		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 
-		//todo check db in schemas
-		if c.server.schemas.GetSchema(c.db) == nil {
-			return NewDefaultMySQLError(ER_BAD_DB_ERROR, c.db)
+		if err := c.useDB(db); err != nil {
+			return err
 		}
 	}
 
@@ -190,45 +200,46 @@ func (c *ClientConn) readHandshakeResponse() error {
 }
 
 func (c *ClientConn) Run() {
-	c.running = true
+	for {
+		data, err := c.ReadPacket()
 
-	go c.onWrite()
+		c.sequence = 0
 
-	c.onRead()
+		if err != nil {
+			log.Error("read packet error %s, close", err.Error())
+			return
+		}
 
-	c.running = false
-
-	close(c.quit)
+		if err := c.dispatch(data); err != nil {
+			log.Error("dispatch error %s", err.Error())
+			c.WriteError(err)
+		}
+	}
 }
 
-func (c *ClientConn) handleReadPacket(data []byte) error {
+func (c *ClientConn) dispatch(data []byte) error {
+	switch data[0] {
+	case COM_QUERY:
+		return c.handleQuery(data[1:])
+	case COM_PING:
+		c.WriteOK(&OKPacket{Status: c.status})
+		return nil
+	case COM_INIT_DB:
+		return c.useDB(string(data[1:]))
+	default:
+		msg := fmt.Sprintf("command %d not supported now", data[0])
+		return NewMySQLError(ER_UNKNOWN_ERROR, msg)
+	}
+
 	return nil
 }
 
-func (c *ClientConn) onRead() {
-	for {
-		data, err := c.ReadPacket()
-		if err != nil {
-			log.Error("read packet error %s", err.Error())
-			return
-		}
-
-		if err := c.handleReadPacket(data); err != nil {
-
-		}
+func (c *ClientConn) useDB(db string) error {
+	if s := c.server.schemas.GetSchema(db); s == nil {
+		return NewDefaultMySQLError(ER_BAD_DB_ERROR, db)
+	} else {
+		c.schema = s
+		c.db = db
 	}
-}
-
-func (c *ClientConn) onWrite() {
-	for {
-		select {
-		case msg := <-c.msgs:
-			if err := c.WritePacket(msg); err != nil {
-				log.Error("write packet error %s", err.Error())
-				return
-			}
-		case <-c.quit:
-			return
-		}
-	}
+	return nil
 }

@@ -5,7 +5,7 @@ user: qing
 password: admin
 
 # max idle conns pool for per datanode
-max_idle_conns: 128
+max_idle_conns: 16
 
 #datanodes represent real mysql instance
 datanodes:
