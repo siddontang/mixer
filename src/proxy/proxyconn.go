@@ -393,8 +393,6 @@ func (c *ProxyConn) ReadTextResult() (*TextResultPacket, error) {
 	result.ColumnDefs = make([][]byte, count)
 	result.Rows = make([][]byte, 0)
 
-	log.Info("column len %d", len(result.ColumnDefs))
-
 	if err = c.readTextResultColumns(result); err != nil {
 		return nil, err
 	}
@@ -424,8 +422,6 @@ func (c *ProxyConn) readTextResultColumns(result *TextResultPacket) (err error) 
 			}
 			return
 		}
-
-		log.Info("%d %d", i, len(result.ColumnDefs))
 
 		result.ColumnDefs[i] = data
 

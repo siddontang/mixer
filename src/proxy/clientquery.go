@@ -13,7 +13,7 @@ func (c *ClientConn) getQueryCmd(data []byte) (string, error) {
 
 	pos := bytes.IndexFunc(buf, unicode.IsSpace)
 	if pos == -1 {
-		return "", NewMySQLError(ER_PARSE_ERROR, "invalid query string")
+		pos = len(buf)
 	}
 
 	return string(bytes.TrimRight(buf[0:pos], "; \t\n")), nil
@@ -131,8 +131,6 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 }
 
 func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
-	log.Info("column len %d", len(result.ColumnDefs))
-
 	count := PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
 
 	data := make([]byte, 4, 1024)
@@ -208,6 +206,8 @@ func (c *ClientConn) handleExec(data []byte) (err error) {
 func (c *ClientConn) handleBegin() error {
 	c.status |= SERVER_STATUS_IN_TRANS
 
+	c.WriteOK(&OKPacket{Status: c.status})
+
 	return nil
 }
 
@@ -223,6 +223,12 @@ func (c *ClientConn) handleCommit() (err error) {
 
 	c.clearNodeConns()
 
+	if err != nil {
+		return
+	} else {
+		c.WriteOK(&OKPacket{Status: c.status})
+	}
+
 	return
 }
 
@@ -237,6 +243,12 @@ func (c *ClientConn) handleRollback() (err error) {
 	}
 
 	c.clearNodeConns()
+
+	if err != nil {
+		return
+	} else {
+		c.WriteOK(&OKPacket{Status: c.status})
+	}
 
 	return
 }

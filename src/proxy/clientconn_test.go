@@ -90,6 +90,84 @@ func TestClientConn_Select(t *testing.T) {
 	}
 }
 
+func TestClientConn_Rollback(t *testing.T) {
+	c := newTestClient()
+	defer c.Close()
+
+	if _, err := c.Begin(); err != nil {
+		t.Fatal(err)
+	}
+
+	s := `insert into mixer_test_clientconn (id, str, f, e) values (2, "abc", 3.14, "test1")`
+	if _, err := c.Exec(s); err != nil {
+		t.Fatal(err)
+	}
+
+	c1 := newTestClient()
+	defer c1.Close()
+
+	s = `select id from mixer_test_clientconn`
+
+	if result, err := c1.Query(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if len(result.Rows) != 1 {
+			t.Fatal(len(result.Rows))
+		}
+	}
+
+	if _, err := c.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+
+	if result, err := c1.Query(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if len(result.Rows) != 1 {
+			t.Fatal(len(result.Rows))
+		}
+	}
+}
+
+func TestClientConn_Commit(t *testing.T) {
+	c := newTestClient()
+	defer c.Close()
+
+	if _, err := c.Begin(); err != nil {
+		t.Fatal(err)
+	}
+
+	s := `insert into mixer_test_clientconn (id, str, f, e) values (2, "abc", 3.14, "test1")`
+	if _, err := c.Exec(s); err != nil {
+		t.Fatal(err)
+	}
+
+	c1 := newTestClient()
+	defer c1.Close()
+
+	s = `select id from mixer_test_clientconn`
+
+	if result, err := c1.Query(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if len(result.Rows) != 1 {
+			t.Fatal(len(result.Rows))
+		}
+	}
+
+	if _, err := c.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if result, err := c1.Query(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if len(result.Rows) != 2 {
+			t.Fatal(len(result.Rows))
+		}
+	}
+}
+
 func TestClientConn_DeleteTable(t *testing.T) {
 	c := newTestProxyConn()
 
