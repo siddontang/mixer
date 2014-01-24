@@ -1,4 +1,4 @@
-package proxy
+package mysql
 
 var MySQLErrName = map[uint16]string{
 	ER_HASHCHK:                                       "hashchk",

@@ -1,4 +1,4 @@
-package proxy
+package mysql
 
 const (
 	DEFAULT_MYSQL_STATE = "HY000"

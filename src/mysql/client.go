@@ -5,39 +5,29 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/siddontang/golib/log"
-	"io"
 	"net"
+	"time"
 )
 
 var (
-	ErrMalformPacket   = errors.New("write Malform error")
-	ErrPayloadLength   = errors.New("invalid payload length")
-	ErrPacketSequence  = errors.New("invalid packet sequence")
-	ErrProtocolVersion = errors.New("invalid protocol version")
-	ErrEOFPacket       = errors.New("eof packet")
-	ErrNotSupported    = errors.New("not supported")
-	ErrMismatchColumns = errors.New("column mismatch")
+	PingPeriod         = int64(time.Second * 60)
+	ErrProtocolVersion = errors.New("invalid protocol version, only support >= 10")
+	ErrLocalInFile     = errors.New("not support for local in file")
 )
 
 //proxy <-> mysql server
-//refer go-sql-driver
 type Client struct {
-	address  string
+	Conn
+	addr     string
 	user     string
 	password string
 	db       string
 
-	conn     net.Conn
-	sequence uint8
+	status  uint16
+	charset byte
+	salt    []byte
 
-	authData   []byte
-	authName   string
-	capability uint32
-	charset    uint8
-	status     uint16
-
-	affectedRows uint64
-	lastInsertId uint64
+	lastPing int64
 }
 
 func NewClient() *Client {
@@ -46,202 +36,69 @@ func NewClient() *Client {
 	return c
 }
 
-func (c *Client) Connect(address string, user string, password string, db string) error {
-	c.address = address
-
+func (c *Client) Connect(addr string, user string, password string, db string) error {
+	c.addr = addr
 	c.user = user
 	c.password = password
 	c.db = db
 
-	c.conn = nil
+	//use utf8
+	c.charset = DEFAULT_UTF8_CHARSET
 
 	return c.ReConnect()
 }
 
 func (c *Client) ReConnect() error {
-	if c.conn != nil {
-		c.conn.Close()
+	if c.NetConn != nil {
+		c.NetConn.Close()
 	}
 
-	conn, err := net.Dial("tcp", c.address)
+	conn, err := net.Dial("tcp", c.addr)
 	if err != nil {
-		log.Error("connect %s error %s", c.address, err.Error())
+		log.Error("connect %s error %s", c.addr, err.Error())
 		return err
 	}
 
-	c.conn = conn
-	c.sequence = 0
+	c.NetConn = conn
+	c.Sequence = 0
 
-	c.authData = []byte{}
-	c.authName = ""
-	c.capability = 0
-	c.charset = 0
-	c.status = 0
-
-	if err := c.readInitPacket(); err != nil {
-		log.Error("read initial handshake packet error %s", err.Error())
+	if err := c.readInitialHandshake(); err != nil {
+		log.Error("read initial handshake error %s", err.Error())
+		c.NetConn.Close()
 		return err
 	}
 
-	if err := c.writeAuthPacket(); err != nil {
-		log.Error("write auth response packet error %s", err.Error())
+	if err := c.writeAuthHandshake(); err != nil {
+		log.Error("write auth handshake error %s", err.Error())
+		c.NetConn.Close()
+
 		return err
 	}
 
-	if err := c.readResultOKPacket(); err != nil {
-		log.Error("read result ok packet error %s", err.Error())
+	if _, err := c.ReadOK(); err != nil {
+		log.Error("read ok error %s", err.Error())
+		c.NetConn.Close()
+
 		return err
 	}
+
+	c.lastPing = time.Now().Unix()
 
 	return nil
 }
 
-func (c *Client) Close() error {
-	err := c.conn.Close()
+func (c *Client) readInitialHandshake() error {
+	data, err := c.ReadPacket()
 	if err != nil {
 		return err
 	}
 
-	c.conn = nil
-
-	return nil
-}
-
-func (c *Client) readPacket() ([]byte, error) {
-	header := make([]byte, 4)
-
-	if _, err := io.ReadFull(c.conn, header); err != nil {
-		return nil, err
-	}
-
-	length := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
-	if length < 1 {
-		log.Error("invalid payload length")
-		return nil, ErrPayloadLength
-	}
-
-	sequence := uint8(header[3])
-
-	if sequence != c.sequence {
-		log.Error("invalid sequence %d != %d", sequence, c.sequence)
-		return nil, ErrPacketSequence
-	}
-
-	c.sequence++
-
-	data := make([]byte, length)
-	if _, err := io.ReadFull(c.conn, data); err != nil {
-		log.Error("read payload data error %s", err.Error())
-		return nil, err
-	} else {
-		if length < MaxPayloadLen {
-			return data, nil
-		}
-
-		var buf []byte
-		buf, err = c.readPacket()
-		if err != nil {
-			log.Error("read packet error %s", err.Error())
-			return nil, err
-		} else {
-			return append(data, buf...), nil
-		}
-	}
-}
-
-//data already have header
-func (c *Client) writePacket(data []byte) error {
-	length := len(data) - 4
-
-	for length >= MaxPayloadLen {
-
-		data[0] = 0xff
-		data[1] = 0xff
-		data[2] = 0xff
-
-		data[3] = c.sequence
-
-		if n, err := c.conn.Write(data[:4+MaxPayloadLen]); err != nil {
-			log.Error("write error %s", err.Error())
-			return err
-		} else if n != (4 + MaxPayloadLen) {
-			log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
-			return ErrMalformPacket
-		} else {
-			c.sequence++
-			length -= MaxPayloadLen
-			data = data[MaxPayloadLen:]
-		}
-	}
-
-	data[0] = byte(length)
-	data[1] = byte(length >> 8)
-	data[2] = byte(length >> 16)
-	data[3] = c.sequence
-
-	if n, err := c.conn.Write(data); err != nil {
-		log.Error("write error %s", err.Error())
-		return err
-	} else if n != len(data) {
-		log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
-		return ErrMalformPacket
-	} else {
-		c.sequence++
-		return nil
-	}
-}
-
-func (c *Client) handleOKPacket(data []byte) error {
-	var n int
-
-	// 0x00 [1 byte]
-
-	// Affected rows [Length Coded Binary]
-	c.affectedRows, _, n = readLengthEncodedInteger(data[1:])
-
-	// Insert id [Length Coded Binary]
-	c.lastInsertId, _, _ = readLengthEncodedInteger(data[1+n:])
-
-	return nil
-}
-
-func (c *Client) handleErrorPacket(data []byte) error {
-	if data[0] != ERR_Packet {
-		return ErrMalformPacket
-	}
-
-	errorCode := binary.LittleEndian.Uint16(data[1:3])
-
-	pos := 3
-	//sql state marker and state
-	//maker is #, state is 5 length
-	if data[pos] == '#' {
-		pos = 9
-	}
-
-	return &MySQLError{
-		Code:    errorCode,
-		Message: string(data[pos:]),
-	}
-}
-
-func (c *Client) handleLocalInFilePacket(data []byte) error {
-	//now we not support local in file protocol
-	return ErrNotSupported
-}
-
-func (c *Client) readInitPacket() error {
-	data, err := c.readPacket()
-	if err != nil {
-		return err
-	}
-
-	if data[0] == ERR_Packet {
-		return c.handleErrorPacket(data)
+	if data[0] == ERR_HEADER {
+		return errors.New("read initial handshake error")
 	}
 
 	if data[0] < MinProtocolVersion {
-		log.Error("invalid protocol version %d < %d", data[0], MinProtocolVersion)
+		log.Error("invalid protocol version %d", data[0])
 		return ErrProtocolVersion
 	}
 
@@ -250,24 +107,25 @@ func (c *Client) readInitPacket() error {
 	//connection id length is 4
 	pos := 1 + bytes.IndexByte(data[1:], 0x00) + 1 + 4
 
-	c.authData = append(c.authData, data[pos:pos+8]...)
+	c.salt = append(c.salt, data[pos:pos+8]...)
 
 	//skip filter
 	pos += 8 + 1
 
 	//capability lower 2 bytes
-	c.capability = uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
+	c.Capability = uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
 
 	pos += 2
 
 	if len(data) > pos {
-		c.charset = data[pos]
+		//skip server charset
+		//c.charset = data[pos]
 		pos += 1
 		c.status = binary.LittleEndian.Uint16(data[pos : pos+2])
 
 		pos += 2
 
-		c.capability = uint32(binary.LittleEndian.Uint16(data[pos:pos+2]))<<16 | c.capability
+		c.Capability = uint32(binary.LittleEndian.Uint16(data[pos:pos+2]))<<16 | c.Capability
 
 		pos += 2
 
@@ -279,25 +137,18 @@ func (c *Client) readInitPacket() error {
 		// The official Python library uses the fixed length 12
 		// mysql-proxy also use 12
 		// which is not documented but seems to work.
-		c.authData = append(c.authData, data[pos:pos+12]...)
+		c.salt = append(c.salt, data[pos:pos+12]...)
 	}
 
 	return nil
 }
 
-func (c *Client) writeAuthPacket() error {
+func (c *Client) writeAuthHandshake() error {
 	// Adjust client capability flags based on server support
-	capability := uint32(
-		CLIENT_PROTOCOL_41 |
-			CLIENT_SECURE_CONNECTION |
-			CLIENT_LONG_PASSWORD |
-			CLIENT_TRANSACTIONS |
-			CLIENT_LOCAL_FILES,
-	)
+	capability := CLIENT_PROTOCOL_41 | CLIENT_SECURE_CONNECTION |
+		CLIENT_LONG_PASSWORD | CLIENT_TRANSACTIONS | CLIENT_LONG_FLAG
 
-	if (c.capability & CLIENT_LONG_FLAG) != 0 {
-		capability |= CLIENT_LONG_FLAG
-	}
+	capability &= c.Capability
 
 	//packet length
 	//capbility 4
@@ -310,7 +161,7 @@ func (c *Client) writeAuthPacket() error {
 	length += len(c.user) + 1
 
 	//we only support secure connection
-	auth := calcPassword(c.authData, []byte(c.password))
+	auth := CalcPassword(c.salt, []byte(c.password))
 
 	length += 1 + len(auth)
 
@@ -320,13 +171,9 @@ func (c *Client) writeAuthPacket() error {
 		length += len(c.db) + 1
 	}
 
-	data := make([]byte, length+4)
+	c.Capability = capability
 
-	// Add the packet header  [24bit length + 1 byte sequence]
-	data[0] = byte(length)
-	data[1] = byte(length >> 8)
-	data[2] = byte(length >> 16)
-	data[3] = c.sequence
+	data := make([]byte, length+4)
 
 	// capability [32 bit]
 	data[4] = byte(capability)
@@ -363,114 +210,13 @@ func (c *Client) writeAuthPacket() error {
 		//data[pos] = 0x00
 	}
 
-	// Send Auth packet
-	return c.writePacket(data)
+	return c.WritePacket(data)
 }
 
-func (c *Client) readResultOKPacket() error {
-	data, err := c.readPacket()
-	if err == nil {
-		switch data[0] {
-		case OK_Packet:
-			return c.handleOKPacket(data)
-		case EOF_Packet:
-			return ErrEOFPacket
-		case ERR_Packet:
-			return c.handleErrorPacket(data)
-		}
-	}
-	return err
-}
+func (c *Client) WriteCommand(command byte) error {
+	c.Sequence = 0
 
-func (c *Client) readTextResultSetColumns(count uint64) (columns [][]byte, err error) {
-	var i uint64
-	var data []byte
-
-	columns = make([][]byte, count)
-
-	for {
-		data, err = c.readPacket()
-		if err != nil {
-			return
-		}
-
-		// EOF Packet
-		if data[0] == EOF_Packet && len(data) <= 5 {
-			if i != count {
-				log.Error("ColumnsCount mismatch n:%d len:%d", count, len(columns))
-				err = ErrMismatchColumns
-			}
-			return
-		}
-
-		columns[i] = data
-
-		i++
-	}
-}
-
-func (c *Client) readTextResultSetRows() (rows [][]byte, err error) {
-	var data []byte
-
-	rows = make([][]byte, 0)
-
-	for {
-		data, err = c.readPacket()
-
-		if err != nil {
-			return
-		}
-
-		// EOF Packet
-		if data[0] == EOF_Packet && len(data) <= 5 {
-			return
-		}
-
-		rows = append(rows, data)
-	}
-}
-
-func (c *Client) readTextResultSetPacket() (columns [][]byte, rows [][]byte, err error) {
-	var data []byte
-
-	data, err = c.readPacket()
-	if err != nil {
-		return
-	}
-
-	switch data[0] {
-	case OK_Packet:
-		err = c.handleOKPacket(data)
-		return
-	case ERR_Packet:
-		err = c.handleErrorPacket(data)
-		return
-	case LocalInFile_Packet:
-		err = c.handleLocalInFilePacket(data[1:])
-		return
-	}
-
-	// column count
-	count, _, n := readLengthEncodedInteger(data)
-	if n-len(data) != 0 {
-		err = ErrMalformPacket
-		return
-	}
-
-	columns, err = c.readTextResultSetColumns(count)
-	if err != nil {
-		return
-	}
-
-	rows, err = c.readTextResultSetRows()
-
-	return
-}
-
-func (c *Client) writeCommandPacket(command byte) error {
-	c.sequence = 0
-
-	return c.writePacket([]byte{
+	return c.WritePacket([]byte{
 		0x01, //1 bytes long
 		0x00,
 		0x00,
@@ -479,30 +225,38 @@ func (c *Client) writeCommandPacket(command byte) error {
 	})
 }
 
-func (c *Client) writeCommandPacketStr(command byte, arg string) error {
-	c.sequence = 0
+func (c *Client) WriteCommandBuf(command byte, arg []byte) error {
+	c.Sequence = 0
 
 	length := len(arg) + 1
 
 	data := make([]byte, length+4)
 
-	//header, will be calculated in writePacket
-	//data[0] = byte(length)
-	//data[1] = byte(length >> 8)
-	//data[2] = byte(length >> 16)
-	//data[3] = c.sequence
+	data[4] = command
+
+	copy(data[5:], arg)
+
+	return c.WritePacket(data)
+}
+
+func (c *Client) WriteCommandStr(command byte, arg string) error {
+	c.Sequence = 0
+
+	length := len(arg) + 1
+
+	data := make([]byte, length+4)
 
 	data[4] = command
 
 	copy(data[5:], arg)
 
-	return c.writePacket(data)
+	return c.WritePacket(data)
 }
 
-func (c *Client) writeCommandPacketUint32(command byte, arg uint32) error {
-	c.sequence = 0
+func (c *Client) WriteCommandUint32(command byte, arg uint32) error {
+	c.Sequence = 0
 
-	return c.writePacket([]byte{
+	return c.WritePacket([]byte{
 		0x05, //5 bytes long
 		0x00,
 		0x00,
@@ -515,4 +269,181 @@ func (c *Client) writeCommandPacketUint32(command byte, arg uint32) error {
 		byte(arg >> 16),
 		byte(arg >> 24),
 	})
+}
+
+func (c *Client) WriteCommandStrStr(command byte, arg1 string, arg2 string) error {
+	c.Sequence = 0
+
+	data := make([]byte, 4, 6+len(arg1)+len(arg2))
+
+	data = append(data, command)
+	data = append(data, arg1...)
+	data = append(data, 0)
+	data = append(data, arg2...)
+
+	return c.WritePacket(data)
+}
+
+func (c *Client) Ping() error {
+	n := time.Now().Unix()
+
+	if n-c.lastPing > PingPeriod {
+		if err := c.WriteCommand(COM_PING); err != nil {
+			return err
+		}
+
+		if _, err := c.ReadOK(); err != nil {
+			return err
+		}
+	}
+
+	c.lastPing = n
+
+	return nil
+}
+
+func (c *Client) Exec(command string) (*OKPacket, error) {
+	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
+		return nil, err
+	}
+
+	return c.ReadOK()
+}
+
+func (c *Client) Begin() (*OKPacket, error) {
+	return c.Exec("begin")
+}
+
+func (c *Client) Commit() (*OKPacket, error) {
+	return c.Exec("commit")
+}
+
+func (c *Client) Rollback() (*OKPacket, error) {
+	return c.Exec("rollback")
+}
+
+func (c *Client) FieldList(table, fieldWildcard string) ([][]byte, error) {
+	if err := c.WriteCommandStrStr(COM_FIELD_LIST, table, fieldWildcard); err != nil {
+		return nil, err
+	}
+
+	data, err := c.ReadPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	if data[0] == ERR_HEADER {
+		return nil, c.LoadError(data)
+	} else if data[0] == EOF_HEADER && len(data) <= 5 {
+		return [][]byte{}, nil
+	}
+
+	columns := make([][]byte, 0)
+	columns = append(columns, data)
+
+	for {
+		data, err = c.ReadPacket()
+		if err != nil {
+			return nil, err
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			return columns, nil
+		}
+
+		columns = append(columns, data)
+	}
+
+	return nil, ErrMalformPacket
+}
+
+func (c *Client) Query(command string) (*TextResultPacket, error) {
+	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
+		return nil, err
+	}
+
+	return c.ReadTextResult()
+}
+
+func (c *Client) ReadTextResult() (*TextResultPacket, error) {
+	data, err := c.ReadPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	switch data[0] {
+	case OK_HEADER:
+		return nil, ErrMalformPacket
+	case ERR_HEADER:
+		return nil, c.LoadError(data)
+	case LocalInFile_HEADER:
+		return nil, ErrLocalInFile
+	}
+
+	result := new(TextResultPacket)
+
+	// column count
+	count, _, n := LengthEncodedInt(data)
+
+	if n-len(data) != 0 {
+		return nil, ErrMalformPacket
+	}
+
+	result.ColumnDefs = make([][]byte, count)
+	result.Rows = make([][]byte, 0)
+
+	if err = c.readTextResultColumns(result); err != nil {
+		return nil, err
+	}
+
+	if err = c.readTextResultRows(result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *Client) readTextResultColumns(result *TextResultPacket) (err error) {
+	var i int = 0
+	var data []byte
+
+	for {
+		data, err = c.ReadPacket()
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			if i != len(result.ColumnDefs) {
+				log.Error("ColumnsCount mismatch n:%d len:%d", i, len(result.ColumnDefs))
+				err = ErrMalformPacket
+			}
+			return
+		}
+
+		result.ColumnDefs[i] = data
+
+		i++
+	}
+}
+
+func (c *Client) readTextResultRows(result *TextResultPacket) (err error) {
+	var data []byte
+
+	for {
+		data, err = c.ReadPacket()
+
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			return
+		}
+
+		result.Rows = append(result.Rows, data)
+	}
 }

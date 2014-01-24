@@ -1,4 +1,4 @@
-package proxy
+package mysql
 
 type OKPacket struct {
 	AffectedRows uint64

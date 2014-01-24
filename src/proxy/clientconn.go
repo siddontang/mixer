@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"github.com/siddontang/golib/log"
 	"io"
+	"mysql"
 	"net"
 	"sync/atomic"
 )
 
-var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG |
-	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
-	CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
+var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
+	mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
+	mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTION
 
 //client <-> proxy
 type ClientConn struct {
-	Conn
+	mysql.Conn
 
 	server *Server
 
@@ -32,7 +33,7 @@ type ClientConn struct {
 
 	schema *Schema
 
-	nodeConns map[*DataNode]*ProxyConn
+	nodeConns map[*DataNode]*mysql.Client
 }
 
 var BaseConnectionId uint32 = 10000
@@ -42,16 +43,16 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 	conn.server = s
 
-	conn.conn = c
-	conn.sequence = 0
+	conn.NetConn = c
+	conn.Sequence = 0
 
 	conn.connectionId = atomic.AddUint32(&BaseConnectionId, 1)
 
-	conn.status = SERVER_STATUS_AUTOCOMMIT
+	conn.status = mysql.SERVER_STATUS_AUTOCOMMIT
 
-	conn.salt, _ = RandomBuf(20)
+	conn.salt, _ = mysql.RandomBuf(20)
 
-	conn.nodeConns = make(map[*DataNode]*ProxyConn)
+	conn.nodeConns = make(map[*DataNode]*mysql.Client)
 
 	return conn
 }
@@ -70,18 +71,18 @@ func (c *ClientConn) Handshake() error {
 		return err
 	}
 
-	if err := c.WriteOK(&OKPacket{0, 0, c.status, 0, ""}); err != nil {
+	if err := c.WriteOK(&mysql.OKPacket{0, 0, c.status, 0, ""}); err != nil {
 		log.Error("write ok fail %s", err.Error())
 		return err
 	}
 
-	c.sequence = 0
+	c.Sequence = 0
 
 	return nil
 }
 
 func (c *ClientConn) Close() error {
-	c.conn.Close()
+	c.NetConn.Close()
 
 	//connection closed but proxy connection may be in trans, cancel
 	for node, conn := range c.nodeConns {
@@ -108,7 +109,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, 10)
 
 	//server version[00]
-	data = append(data, ServerVersion...)
+	data = append(data, mysql.ServerVersion...)
 	data = append(data, 0)
 
 	//connection id
@@ -124,7 +125,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	data = append(data, DEFAULT_UTF8_CHARSET)
+	data = append(data, mysql.DEFAULT_UTF8_CHARSET)
 
 	//status
 	data = append(data, byte(c.status), byte(c.status>>8))
@@ -158,7 +159,7 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos := 0
 
 	//capability
-	c.capability = binary.LittleEndian.Uint32(data[:4])
+	c.Capability = binary.LittleEndian.Uint32(data[:4])
 	pos += 4
 
 	//skip max packet size
@@ -180,15 +181,15 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos++
 	auth := data[pos : pos+authLen]
 
-	checkAuth := CalcPassword(c.salt, []byte(c.server.cfg.Password))
+	checkAuth := mysql.CalcPassword(c.salt, []byte(c.server.cfg.Password))
 
 	if !bytes.Equal(auth, checkAuth) {
-		return NewDefaultMySQLError(ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
+		return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
 	}
 
 	pos += authLen
 
-	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
+	if c.Capability|mysql.CLIENT_CONNECT_WITH_DB > 0 {
 		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 
@@ -216,22 +217,22 @@ func (c *ClientConn) Run() {
 			c.WriteError(err)
 		}
 
-		c.sequence = 0
+		c.Sequence = 0
 	}
 }
 
 func (c *ClientConn) dispatch(data []byte) error {
 	switch data[0] {
-	case COM_QUERY:
+	case mysql.COM_QUERY:
 		return c.handleQuery(data[1:])
-	case COM_PING:
-		c.WriteOK(&OKPacket{Status: c.status})
+	case mysql.COM_PING:
+		c.WriteOK(&mysql.OKPacket{Status: c.status})
 		return nil
-	case COM_INIT_DB:
+	case mysql.COM_INIT_DB:
 		return c.useDB(string(data[1:]))
 	default:
 		msg := fmt.Sprintf("command %d not supported now", data[0])
-		return NewMySQLError(ER_UNKNOWN_ERROR, msg)
+		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, msg)
 	}
 
 	return nil
@@ -239,7 +240,7 @@ func (c *ClientConn) dispatch(data []byte) error {
 
 func (c *ClientConn) useDB(db string) error {
 	if s := c.server.schemas.GetSchema(db); s == nil {
-		return NewDefaultMySQLError(ER_BAD_DB_ERROR, db)
+		return mysql.NewDefaultError(mysql.ER_BAD_DB_ERROR, db)
 	} else {
 		c.schema = s
 		c.db = db

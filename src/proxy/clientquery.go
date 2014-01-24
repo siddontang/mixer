@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/siddontang/golib/log"
+	"mysql"
 	"unicode"
 )
 
@@ -46,28 +47,28 @@ func (c *ClientConn) handleQuery(data []byte) error {
 	case "rollback":
 		return c.handleRollback()
 	default:
-		return NewMySQLError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", data))
+		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", data))
 	}
 
 	return nil
 }
 
 func (c *ClientConn) isInTrans() bool {
-	return c.status&SERVER_STATUS_IN_TRANS > 0
+	return c.status&mysql.SERVER_STATUS_IN_TRANS > 0
 }
 
 func (c *ClientConn) routeQuery(data []byte) error {
 	if c.schema == nil {
-		return NewDefaultMySQLError(ER_NO_DB_ERROR)
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
 	r, err := c.schema.Route(data)
 	if err != nil {
 		log.Error("schema route error %s", err.Error())
-		return NewMySQLError(ER_UNKNOWN_ERROR, err.Error())
+		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, err.Error())
 	}
 
-	var conn *ProxyConn
+	var conn *mysql.Client
 	var ok bool
 	for node, query := range r {
 		if conn, ok = c.nodeConns[node]; !ok {
@@ -86,7 +87,7 @@ func (c *ClientConn) routeQuery(data []byte) error {
 			c.nodeConns[node] = conn
 		}
 
-		if err = conn.WriteCommandBuf(COM_QUERY, query); err != nil {
+		if err = conn.WriteCommandBuf(mysql.COM_QUERY, query); err != nil {
 			log.Error("node %s write command error %s", node.name, err.Error())
 			return err
 		}
@@ -100,7 +101,7 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 		return
 	}
 
-	var result *TextResultPacket = nil
+	var result *mysql.TextResultPacket = nil
 
 	for node, conn := range c.nodeConns {
 		if r, err1 := conn.ReadTextResult(); err1 != nil {
@@ -130,8 +131,8 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 	return
 }
 
-func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
-	count := PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
+func (c *ClientConn) writeTextResult(result *mysql.TextResultPacket) error {
+	count := mysql.PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
 
 	data := make([]byte, 4, 1024)
 	data = append(data, count...)
@@ -147,7 +148,7 @@ func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
 		}
 	}
 
-	if err := c.WriteEOF(&EOFPacket{Status: c.status}); err != nil {
+	if err := c.WriteEOF(&mysql.EOFPacket{Status: c.status}); err != nil {
 		return err
 	}
 
@@ -159,7 +160,7 @@ func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
 		}
 	}
 
-	if err := c.WriteEOF(&EOFPacket{Status: c.status}); err != nil {
+	if err := c.WriteEOF(&mysql.EOFPacket{Status: c.status}); err != nil {
 		return err
 	}
 
@@ -171,7 +172,7 @@ func (c *ClientConn) handleExec(data []byte) (err error) {
 		return
 	}
 
-	pkg := &OKPacket{Status: c.status}
+	pkg := &mysql.OKPacket{Status: c.status}
 
 	for node, conn := range c.nodeConns {
 		if p, err1 := conn.ReadOK(); err1 != nil {
@@ -204,15 +205,15 @@ func (c *ClientConn) handleExec(data []byte) (err error) {
 }
 
 func (c *ClientConn) handleBegin() error {
-	c.status |= SERVER_STATUS_IN_TRANS
+	c.status |= mysql.SERVER_STATUS_IN_TRANS
 
-	c.WriteOK(&OKPacket{Status: c.status})
+	c.WriteOK(&mysql.OKPacket{Status: c.status})
 
 	return nil
 }
 
 func (c *ClientConn) handleCommit() (err error) {
-	c.status &= ^SERVER_STATUS_IN_TRANS
+	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
 
 	for n, v := range c.nodeConns {
 		if _, err1 := v.Commit(); err1 != nil {
@@ -226,14 +227,14 @@ func (c *ClientConn) handleCommit() (err error) {
 	if err != nil {
 		return
 	} else {
-		c.WriteOK(&OKPacket{Status: c.status})
+		c.WriteOK(&mysql.OKPacket{Status: c.status})
 	}
 
 	return
 }
 
 func (c *ClientConn) handleRollback() (err error) {
-	c.status &= ^SERVER_STATUS_IN_TRANS
+	c.status &= ^mysql.SERVER_STATUS_IN_TRANS
 
 	for n, v := range c.nodeConns {
 		if _, err1 := v.Rollback(); err1 != nil {
@@ -247,7 +248,7 @@ func (c *ClientConn) handleRollback() (err error) {
 	if err != nil {
 		return
 	} else {
-		c.WriteOK(&OKPacket{Status: c.status})
+		c.WriteOK(&mysql.OKPacket{Status: c.status})
 	}
 
 	return

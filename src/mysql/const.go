@@ -4,28 +4,29 @@ const (
 	MinProtocolVersion byte   = 10
 	MaxPayloadLen      int    = 1<<24 - 1
 	TimeFormat         string = "2006-01-02 15:04:05"
+	ServerVersion      string = "5.5.31-mixer-0.1"
 )
 
 const (
-	OK_Packet          byte = 0x00
-	ERR_Packet         byte = 0xff
-	EOF_Packet         byte = 0xfe
-	LocalInFile_Packet byte = 0xfb
+	OK_HEADER          byte = 0x00
+	ERR_HEADER         byte = 0xff
+	EOF_HEADER         byte = 0xfe
+	LocalInFile_HEADER byte = 0xfb
 )
 
 const (
-	SERVER_STATUS_IN_TRANS             = 0x0001
-	SERVER_STATUS_AUTOCOMMIT           = 0x0002
-	SERVER_MORE_RESULTS_EXISTS         = 0x0008
-	SERVER_STATUS_NO_GOOD_INDEX_USED   = 0x0010
-	SERVER_STATUS_NO_INDEX_USED        = 0x0020
-	SERVER_STATUS_CURSOR_EXISTS        = 0x0040
-	SERVER_STATUS_LAST_ROW_SEND        = 0x0080
-	SERVER_STATUS_DB_DROPPED           = 0x0100
-	SERVER_STATUS_NO_BACKSLASH_ESCAPED = 0x0200
-	SERVER_STATUS_METADATA_CHANGED     = 0x0400
-	SERVER_QUERY_WAS_SLOW              = 0x0800
-	SERVER_PS_OUT_PARAMS               = 0x1000
+	SERVER_STATUS_IN_TRANS             uint16 = 0x0001
+	SERVER_STATUS_AUTOCOMMIT                  = 0x0002
+	SERVER_MORE_RESULTS_EXISTS                = 0x0008
+	SERVER_STATUS_NO_GOOD_INDEX_USED          = 0x0010
+	SERVER_STATUS_NO_INDEX_USED               = 0x0020
+	SERVER_STATUS_CURSOR_EXISTS               = 0x0040
+	SERVER_STATUS_LAST_ROW_SEND               = 0x0080
+	SERVER_STATUS_DB_DROPPED                  = 0x0100
+	SERVER_STATUS_NO_BACKSLASH_ESCAPED        = 0x0200
+	SERVER_STATUS_METADATA_CHANGED            = 0x0400
+	SERVER_QUERY_WAS_SLOW                     = 0x0800
+	SERVER_PS_OUT_PARAMS                      = 0x1000
 )
 
 const (
@@ -137,4 +138,10 @@ const (
 	PART_KEY_FLAG       = 16384
 	GROUP_FLAG          = 32768
 	UNIQUE_FLAG         = 65536
+)
+
+const (
+	DEFAULT_UTF8_CHARSET byte = 33
+
+	AUTH_NAME = "mysql_native_password"
 )

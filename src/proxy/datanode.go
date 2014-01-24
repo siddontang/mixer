@@ -3,6 +3,7 @@ package proxy
 import (
 	"container/list"
 	"github.com/siddontang/golib/log"
+	"mysql"
 	"strings"
 	"sync"
 	"time"
@@ -63,13 +64,13 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	return dn
 }
 
-func (dn *DataNode) PopConn() (*ProxyConn, error) {
-	var c *ProxyConn
+func (dn *DataNode) PopConn() (*mysql.Client, error) {
+	var c *mysql.Client
 
 	dn.lock.Lock()
 	if v := dn.conns.Back(); v != nil {
 		dn.conns.Remove(v)
-		c = v.Value.(*ProxyConn)
+		c = v.Value.(*mysql.Client)
 	}
 	dn.lock.Unlock()
 
@@ -80,7 +81,7 @@ func (dn *DataNode) PopConn() (*ProxyConn, error) {
 		}
 	}
 
-	c = NewProxyConn()
+	c = mysql.NewClient()
 
 	if err := c.Connect(dn.addr, dn.user, dn.password, dn.db); err != nil {
 		log.Error("connect %s node error %s", dn.name, err.Error())
@@ -98,15 +99,15 @@ func (dn *DataNode) PopConn() (*ProxyConn, error) {
 	return c, nil
 }
 
-func (dn *DataNode) PushConn(c *ProxyConn) {
-	var closeConn *ProxyConn
+func (dn *DataNode) PushConn(c *mysql.Client) {
+	var closeConn *mysql.Client
 	dn.lock.Lock()
 
 	if dn.conns.Len() > dn.maxIdleConns {
 		oldConn := dn.conns.Front()
 		dn.conns.Remove(oldConn)
 
-		closeConn = oldConn.Value.(*ProxyConn)
+		closeConn = oldConn.Value.(*mysql.Client)
 	}
 
 	dn.conns.PushBack(c)

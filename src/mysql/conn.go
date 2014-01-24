@@ -1,4 +1,4 @@
-package proxy
+package mysql
 
 import (
 	"encoding/binary"
@@ -17,31 +17,31 @@ var (
 )
 
 type Conn struct {
-	conn net.Conn
+	NetConn net.Conn
 
-	sequence uint8
+	Sequence uint8
 
-	capability uint32
+	Capability uint32
 }
 
 func (c *Conn) Close() error {
-	err := c.conn.Close()
-	c.conn = nil
+	err := c.NetConn.Close()
+	c.NetConn = nil
 	return err
 }
 
 func (c *Conn) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
+	return c.NetConn.RemoteAddr()
 }
 
 func (c *Conn) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
+	return c.NetConn.LocalAddr()
 }
 
 func (c *Conn) ReadPacket() ([]byte, error) {
 	header := make([]byte, 4)
 
-	if _, err := io.ReadFull(c.conn, header); err != nil {
+	if _, err := io.ReadFull(c.NetConn, header); err != nil {
 		return nil, err
 	}
 
@@ -53,15 +53,15 @@ func (c *Conn) ReadPacket() ([]byte, error) {
 
 	sequence := uint8(header[3])
 
-	if sequence != c.sequence {
-		log.Error("invalid sequence %d != %d", sequence, c.sequence)
+	if sequence != c.Sequence {
+		log.Error("invalid sequence %d != %d", sequence, c.Sequence)
 		return nil, ErrPacketSequence
 	}
 
-	c.sequence++
+	c.Sequence++
 
 	data := make([]byte, length)
-	if _, err := io.ReadFull(c.conn, data); err != nil {
+	if _, err := io.ReadFull(c.NetConn, data); err != nil {
 		log.Error("read payload data error %s", err.Error())
 		return nil, err
 	} else {
@@ -90,16 +90,16 @@ func (c *Conn) WritePacket(data []byte) error {
 		data[1] = 0xff
 		data[2] = 0xff
 
-		data[3] = c.sequence
+		data[3] = c.Sequence
 
-		if n, err := c.conn.Write(data[:4+MaxPayloadLen]); err != nil {
+		if n, err := c.NetConn.Write(data[:4+MaxPayloadLen]); err != nil {
 			log.Error("write error %s", err.Error())
 			return err
 		} else if n != (4 + MaxPayloadLen) {
 			log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
 			return ErrMalformPacket
 		} else {
-			c.sequence++
+			c.Sequence++
 			length -= MaxPayloadLen
 			data = data[MaxPayloadLen:]
 		}
@@ -108,16 +108,16 @@ func (c *Conn) WritePacket(data []byte) error {
 	data[0] = byte(length)
 	data[1] = byte(length >> 8)
 	data[2] = byte(length >> 16)
-	data[3] = c.sequence
+	data[3] = c.Sequence
 
-	if n, err := c.conn.Write(data); err != nil {
+	if n, err := c.NetConn.Write(data); err != nil {
 		log.Error("write error %s", err.Error())
 		return err
 	} else if n != len(data) {
 		log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
 		return ErrMalformPacket
 	} else {
-		c.sequence++
+		c.Sequence++
 		return nil
 	}
 }
@@ -130,10 +130,10 @@ func (c *Conn) DumpOK(pkg *OKPacket) []byte {
 	data = append(data, PutLengthEncodedInt(pkg.AffectedRows)...)
 	data = append(data, PutLengthEncodedInt(pkg.LastInsertId)...)
 
-	if c.capability|CLIENT_PROTOCOL_41 > 0 {
+	if c.Capability|CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
 		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
-	} else if c.capability|CLIENT_TRANSACTIONS > 0 {
+	} else if c.Capability|CLIENT_TRANSACTIONS > 0 {
 		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
 	}
 
@@ -146,7 +146,7 @@ func (c *Conn) DumpError(e error) []byte {
 	var m *MySQLError
 	var ok bool
 	if m, ok = e.(*MySQLError); !ok {
-		m = NewMySQLError(ER_UNKNOWN_ERROR, e.Error())
+		m = NewError(ER_UNKNOWN_ERROR, e.Error())
 	}
 
 	data := make([]byte, 4, 16+len(m.Message))
@@ -167,7 +167,7 @@ func (c *Conn) DumpEOF(pkg *EOFPacket) []byte {
 
 	data = append(data, EOF_HEADER)
 
-	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+	if c.Capability&CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
 		data = append(data, byte(pkg.Status), byte(pkg.Status>>8))
 	}
@@ -189,12 +189,12 @@ func (c *Conn) LoadOK(data []byte) *OKPacket {
 	pkg.LastInsertId, _, n = LengthEncodedInt(data[pos:])
 	pos += n
 
-	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+	if c.Capability&CLIENT_PROTOCOL_41 > 0 {
 		pkg.Status = binary.LittleEndian.Uint16(data[pos:])
 		pos += 2
 		pkg.Warnings = binary.LittleEndian.Uint16(data[pos:])
 		pos += 2
-	} else if c.capability&CLIENT_TRANSACTIONS > 0 {
+	} else if c.Capability&CLIENT_TRANSACTIONS > 0 {
 		pkg.Status = binary.LittleEndian.Uint16(data[pos:])
 		pos += 2
 	}
@@ -215,7 +215,7 @@ func (c *Conn) LoadError(data []byte) *MySQLError {
 	e.Code = binary.LittleEndian.Uint16(data[pos:])
 	pos += 2
 
-	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+	if c.Capability&CLIENT_PROTOCOL_41 > 0 {
 		//skip '#'
 		pos++
 		e.State = string(data[pos : pos+5])
@@ -234,7 +234,7 @@ func (c *Conn) LoadEOF(data []byte) *EOFPacket {
 	}
 
 	pkg := new(EOFPacket)
-	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+	if c.Capability&CLIENT_PROTOCOL_41 > 0 {
 		pkg.Warnings = binary.LittleEndian.Uint16(data[1:])
 		pkg.Status = binary.LittleEndian.Uint16(data[3:])
 	}

@@ -1,17 +1,44 @@
 package proxy
 
 import (
+	"github.com/siddontang/golib/log"
+	"mysql"
+	"sync"
 	"testing"
 )
 
-func newTestClient() *ProxyConn {
-	c := NewProxyConn()
+func newTestClient() *mysql.Client {
+	c := mysql.NewClient()
 
 	if err := c.Connect("127.0.0.1:3306", "qing", "admin", "mixer"); err != nil {
 		return nil
 	}
 
 	return c
+}
+
+var testMySQLClient *mysql.Client
+var testMySQLClientOnce sync.Once
+
+func newTestMySQLClient() *mysql.Client {
+	f := func() {
+		c := mysql.NewClient()
+
+		if err := c.Connect("10.20.135.213:3306", "qing", "admin", "mixer"); err != nil {
+			log.Error("%s", err.Error())
+		}
+
+		if _, err := c.Exec("set autocommit = 1"); err != nil {
+			log.Error("set autocommit error %s", err.Error())
+			c.Close()
+		}
+
+		testMySQLClient = c
+	}
+
+	testMySQLClientOnce.Do(f)
+
+	return testMySQLClient
 }
 
 func TestClientConn_Handshake(t *testing.T) {
@@ -34,7 +61,7 @@ func TestClientConn_CreateTable(t *testing.T) {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
-	c := newTestProxyConn()
+	c := newTestMySQLClient()
 
 	if _, err := c.Exec(s); err != nil {
 		t.Fatal(err)
@@ -169,7 +196,7 @@ func TestClientConn_Commit(t *testing.T) {
 }
 
 func TestClientConn_DeleteTable(t *testing.T) {
-	c := newTestProxyConn()
+	c := newTestMySQLClient()
 
 	if _, err := c.Exec("drop table mixer_test_clientconn"); err != nil {
 		t.Fatal(err)

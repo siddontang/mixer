@@ -1,11 +1,12 @@
 package mysql
 
 import (
+	"crypto/rand"
 	"crypto/sha1"
 	"io"
 )
 
-func calcPassword(scramble, password []byte) []byte {
+func CalcPassword(scramble, password []byte) []byte {
 	if len(password) == 0 {
 		return nil
 	}
@@ -34,39 +35,17 @@ func calcPassword(scramble, password []byte) []byte {
 	return scramble
 }
 
-func readLengthEnodedString(b []byte) ([]byte, bool, int, error) {
-	// Get length
-	num, isNull, n := readLengthEncodedInteger(b)
-	if num < 1 {
-		return nil, isNull, n, nil
+func RandomBuf(size int) ([]byte, error) {
+	buf := make([]byte, size)
+
+	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
+		return nil, err
 	}
 
-	n += int(num)
-
-	// Check data length
-	if len(b) >= n {
-		return b[n-int(num) : n], false, n, nil
-	}
-	return nil, false, n, io.EOF
+	return buf, nil
 }
 
-func skipLengthEnodedString(b []byte) (int, error) {
-	// Get length
-	num, _, n := readLengthEncodedInteger(b)
-	if num < 1 {
-		return n, nil
-	}
-
-	n += int(num)
-
-	// Check data length
-	if len(b) >= n {
-		return n, nil
-	}
-	return n, io.EOF
-}
-
-func readLengthEncodedInteger(b []byte) (num uint64, isNull bool, n int) {
+func LengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
 	switch b[0] {
 
 	// 251: NULL
@@ -91,7 +70,7 @@ func readLengthEncodedInteger(b []byte) (num uint64, isNull bool, n int) {
 	case 0xfe:
 		num = uint64(b[1]) | uint64(b[2])<<8 | uint64(b[3])<<16 |
 			uint64(b[4])<<24 | uint64(b[5])<<32 | uint64(b[6])<<40 |
-			uint64(b[7])<<48 | uint64(b[8])<<54
+			uint64(b[7])<<48 | uint64(b[8])<<56
 		n = 9
 		return
 	}
@@ -102,7 +81,7 @@ func readLengthEncodedInteger(b []byte) (num uint64, isNull bool, n int) {
 	return
 }
 
-func lengthEncodedIntegerToBytes(n uint64) []byte {
+func PutLengthEncodedInt(n uint64) []byte {
 	switch {
 	case n <= 250:
 		return []byte{byte(n)}
@@ -112,6 +91,10 @@ func lengthEncodedIntegerToBytes(n uint64) []byte {
 
 	case n <= 0xffffff:
 		return []byte{0xfd, byte(n), byte(n >> 8), byte(n >> 16)}
+
+	case n <= 0xffffffffffffffff:
+		return []byte{0xfe, byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24),
+			byte(n >> 32), byte(n >> 40), byte(n >> 48), byte(n >> 56)}
 	}
 	return nil
 }
