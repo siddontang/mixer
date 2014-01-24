@@ -42,6 +42,9 @@ func (c *ProxyConn) Connect(addr string, user string, password string, db string
 	c.password = password
 	c.db = db
 
+	//use utf8
+	c.charset = DEFAULT_UTF8_CHARSET
+
 	return c.ReConnect()
 }
 
@@ -116,7 +119,8 @@ func (c *ProxyConn) readInitialHandshake() error {
 	pos += 2
 
 	if len(data) > pos {
-		c.charset = data[pos]
+		//skip server charset
+		//c.charset = data[pos]
 		pos += 1
 		c.status = binary.LittleEndian.Uint16(data[pos : pos+2])
 
@@ -268,6 +272,19 @@ func (c *ProxyConn) WriteCommandUint32(command byte, arg uint32) error {
 	})
 }
 
+func (c *ProxyConn) WriteCommandStrStr(command byte, arg1 string, arg2 string) error {
+	c.sequence = 0
+
+	data := make([]byte, 4, 6+len(arg1)+len(arg2))
+
+	data = append(data, command)
+	data = append(data, arg1...)
+	data = append(data, 0)
+	data = append(data, arg2...)
+
+	return c.WritePacket(data)
+}
+
 func (c *ProxyConn) Ping() error {
 	n := time.Now().Unix()
 
@@ -280,6 +297,8 @@ func (c *ProxyConn) Ping() error {
 			return err
 		}
 	}
+
+	c.lastPing = n
 
 	return nil
 }
@@ -302,6 +321,50 @@ func (c *ProxyConn) Commit() (*OKPacket, error) {
 
 func (c *ProxyConn) Rollback() (*OKPacket, error) {
 	return c.Exec("rollback")
+}
+
+func (c *ProxyConn) FieldList(table, fieldWildcard string) ([][]byte, error) {
+	if err := c.WriteCommandStrStr(COM_FIELD_LIST, table, fieldWildcard); err != nil {
+		return nil, err
+	}
+
+	data, err := c.ReadPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	if data[0] == ERR_HEADER {
+		return nil, c.LoadError(data)
+	} else if data[0] == EOF_HEADER && len(data) <= 5 {
+		return [][]byte{}, nil
+	}
+
+	columns := make([][]byte, 0)
+	columns = append(columns, data)
+
+	for {
+		data, err = c.ReadPacket()
+		if err != nil {
+			return nil, err
+		}
+
+		// EOF Packet
+		if data[0] == EOF_HEADER && len(data) <= 5 {
+			return columns, nil
+		}
+
+		columns = append(columns, data)
+	}
+
+	return nil, ErrMalformPacket
+}
+
+func (c *ProxyConn) Query(command string) (*TextResultPacket, error) {
+	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
+		return nil, err
+	}
+
+	return c.ReadTextResult()
 }
 
 func (c *ProxyConn) ReadTextResult() (*TextResultPacket, error) {

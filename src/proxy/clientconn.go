@@ -203,8 +203,6 @@ func (c *ClientConn) Run() {
 	for {
 		data, err := c.ReadPacket()
 
-		c.sequence = 0
-
 		if err != nil {
 			log.Error("read packet error %s, close", err.Error())
 			return
@@ -214,6 +212,8 @@ func (c *ClientConn) Run() {
 			log.Error("dispatch error %s", err.Error())
 			c.WriteError(err)
 		}
+
+		c.sequence = 0
 	}
 }
 

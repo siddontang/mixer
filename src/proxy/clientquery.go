@@ -205,7 +205,8 @@ func (c *ClientConn) handleCommit() (err error) {
 	c.status &= ^SERVER_STATUS_IN_TRANS
 
 	for n, v := range c.nodeConns {
-		if _, err = v.Commit(); err != nil {
+		if _, err1 := v.Commit(); err1 != nil {
+			err = err1
 			log.Error("%s commit error %s", n.name, err.Error())
 		}
 	}
@@ -219,7 +220,8 @@ func (c *ClientConn) handleRollback() (err error) {
 	c.status &= ^SERVER_STATUS_IN_TRANS
 
 	for n, v := range c.nodeConns {
-		if _, err = v.Rollback(); err != nil {
+		if _, err1 := v.Rollback(); err1 != nil {
+			err = err1
 			log.Error("%s rollback error %s", n.name, err.Error())
 		}
 	}
