@@ -87,6 +87,14 @@ func (dn *DataNode) PopConn() (*ProxyConn, error) {
 		return nil, err
 	}
 
+	//we must always use autocommit
+	if _, err := c.Exec("set autocommit = 1"); err != nil {
+		log.Error("set autocommit error %s", err.Error())
+		c.Close()
+
+		return nil, err
+	}
+
 	return c, nil
 }
 

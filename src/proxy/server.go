@@ -4,6 +4,7 @@ import (
 	"github.com/siddontang/golib/log"
 	"github.com/siddontang/golib/timingwheel"
 	"net"
+	"runtime"
 	"time"
 )
 
@@ -77,6 +78,17 @@ func (s *Server) Stop() {
 func (s *Server) onConn(c net.Conn) {
 	conn := NewClientConn(s, c)
 
+	defer func() {
+		if err := recover(); err != nil {
+			const size = 4096
+			buf := make([]byte, size)
+			buf = buf[:runtime.Stack(buf, false)]
+			log.Error("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
+		}
+
+		conn.Close()
+	}()
+
 	if err := conn.Handshake(); err != nil {
 		log.Error("handshake error %s", err.Error())
 		c.Close()
@@ -84,6 +96,4 @@ func (s *Server) onConn(c net.Conn) {
 	}
 
 	conn.Run()
-
-	conn.Close()
 }

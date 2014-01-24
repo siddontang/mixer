@@ -64,22 +64,21 @@ func (c *ProxyConn) ReConnect() error {
 
 	if err := c.readInitialHandshake(); err != nil {
 		log.Error("read initial handshake error %s", err.Error())
+		c.conn.Close()
 		return err
 	}
 
 	if err := c.writeAuthHandshake(); err != nil {
 		log.Error("write auth handshake error %s", err.Error())
+		c.conn.Close()
+
 		return err
 	}
 
 	if _, err := c.ReadOK(); err != nil {
 		log.Error("read ok error %s", err.Error())
-		return err
-	}
+		c.conn.Close()
 
-	//we must always use autocommit
-	if _, err := c.Exec("set autocommit = 1"); err != nil {
-		log.Error("set autocommit error %s", err.Error())
 		return err
 	}
 
@@ -392,6 +391,9 @@ func (c *ProxyConn) ReadTextResult() (*TextResultPacket, error) {
 	}
 
 	result.ColumnDefs = make([][]byte, count)
+	result.Rows = make([][]byte, 0)
+
+	log.Info("column len %d", len(result.ColumnDefs))
 
 	if err = c.readTextResultColumns(result); err != nil {
 		return nil, err
@@ -423,6 +425,8 @@ func (c *ProxyConn) readTextResultColumns(result *TextResultPacket) (err error) 
 			return
 		}
 
+		log.Info("%d %d", i, len(result.ColumnDefs))
+
 		result.ColumnDefs[i] = data
 
 		i++
@@ -431,8 +435,6 @@ func (c *ProxyConn) readTextResultColumns(result *TextResultPacket) (err error) 
 
 func (c *ProxyConn) readTextResultRows(result *TextResultPacket) (err error) {
 	var data []byte
-
-	result.Rows = make([][]byte, 0)
 
 	for {
 		data, err = c.ReadPacket()

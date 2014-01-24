@@ -17,6 +17,11 @@ func newTestProxyConn() *ProxyConn {
 			log.Error("%s", err.Error())
 		}
 
+		if _, err := c.Exec("set autocommit = 1"); err != nil {
+			log.Error("set autocommit error %s", err.Error())
+			c.Close()
+		}
+
 		testProxyConn = c
 	}
 

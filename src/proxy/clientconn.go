@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/siddontang/golib/log"
+	"io"
 	"net"
 	"sync/atomic"
 )
@@ -204,7 +205,9 @@ func (c *ClientConn) Run() {
 		data, err := c.ReadPacket()
 
 		if err != nil {
-			log.Error("read packet error %s, close", err.Error())
+			if err != io.EOF {
+				log.Error("read packet error %s, close", err.Error())
+			}
 			return
 		}
 

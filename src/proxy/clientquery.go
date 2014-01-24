@@ -123,20 +123,28 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 
 	if err != nil {
 		return
+	} else {
+		c.writeTextResult(result)
 	}
 
 	return
 }
 
 func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
+	log.Info("column len %d", len(result.ColumnDefs))
+
 	count := PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
 
-	if err := c.WritePacket(count); err != nil {
+	data := make([]byte, 4, 1024)
+	data = append(data, count...)
+	if err := c.WritePacket(data); err != nil {
 		return err
 	}
 
 	for _, column := range result.ColumnDefs {
-		if err := c.WritePacket(column); err != nil {
+		data = data[0:4]
+		data = append(data, column...)
+		if err := c.WritePacket(data); err != nil {
 			return err
 		}
 	}
@@ -146,7 +154,9 @@ func (c *ClientConn) writeTextResult(result *TextResultPacket) error {
 	}
 
 	for _, row := range result.Rows {
-		if err := c.WritePacket(row); err != nil {
+		data = data[0:4]
+		data = append(data, row...)
+		if err := c.WritePacket(data); err != nil {
 			return err
 		}
 	}

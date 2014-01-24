@@ -163,7 +163,9 @@ func (c *Conn) DumpError(e error) []byte {
 }
 
 func (c *Conn) DumpEOF(pkg *EOFPacket) []byte {
-	data := make([]byte, 4, 8)
+	data := make([]byte, 4, 9)
+
+	data = append(data, EOF_HEADER)
 
 	if c.capability&CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(pkg.Warnings), byte(pkg.Warnings>>8))
