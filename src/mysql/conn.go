@@ -29,6 +29,8 @@ type Conn struct {
 	salt    []byte
 
 	lastPing int64
+
+	stmts map[string]*Stmt
 }
 
 func NewConn() *Conn {
@@ -359,15 +361,15 @@ func (c *Conn) FieldList(table, fieldWildcard string) ([][]byte, error) {
 	return nil, ErrMalformPacket
 }
 
-func (c *Conn) Query(command string) (*TextResultPacket, error) {
+func (c *Conn) Query(command string) (*ResultsetPacket, error) {
 	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
 		return nil, err
 	}
 
-	return c.ReadTextResult()
+	return c.ReadResultset(false)
 }
 
-func (c *Conn) ReadTextResult() (*TextResultPacket, error) {
+func (c *Conn) ReadResultset(binary bool) (*ResultsetPacket, error) {
 	data, err := c.ReadPacket()
 	if err != nil {
 		return nil, err
@@ -382,7 +384,8 @@ func (c *Conn) ReadTextResult() (*TextResultPacket, error) {
 		return nil, ErrLocalInFile
 	}
 
-	result := new(TextResultPacket)
+	result := new(ResultsetPacket)
+	result.binary = binary
 
 	// column count
 	count, _, n := LengthEncodedInt(data)
@@ -394,18 +397,18 @@ func (c *Conn) ReadTextResult() (*TextResultPacket, error) {
 	result.ColumnDefs = make([][]byte, count)
 	result.Rows = make([][]byte, 0)
 
-	if err = c.readTextResultColumns(result); err != nil {
+	if err = c.readResultColumns(result); err != nil {
 		return nil, err
 	}
 
-	if err = c.readTextResultRows(result); err != nil {
+	if err = c.readResultRows(result); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
 
-func (c *Conn) readTextResultColumns(result *TextResultPacket) (err error) {
+func (c *Conn) readResultColumns(result *ResultsetPacket) (err error) {
 	var i int = 0
 	var data []byte
 
@@ -430,7 +433,7 @@ func (c *Conn) readTextResultColumns(result *TextResultPacket) (err error) {
 	}
 }
 
-func (c *Conn) readTextResultRows(result *TextResultPacket) (err error) {
+func (c *Conn) readResultRows(result *ResultsetPacket) (err error) {
 	var data []byte
 
 	for {

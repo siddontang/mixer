@@ -98,3 +98,32 @@ func PutLengthEncodedInt(n uint64) []byte {
 	}
 	return nil
 }
+
+func Uint16ToBytes(n uint16) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+	}
+}
+
+func Uint32ToBytes(n uint32) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+		byte(n >> 16),
+		byte(n >> 24),
+	}
+}
+
+func Uint64ToBytes(n uint64) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+		byte(n >> 16),
+		byte(n >> 24),
+		byte(n >> 32),
+		byte(n >> 40),
+		byte(n >> 48),
+		byte(n >> 56),
+	}
+}

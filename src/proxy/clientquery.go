@@ -101,10 +101,10 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 		return
 	}
 
-	var result *mysql.TextResultPacket = nil
+	var result *mysql.ResultsetPacket = nil
 
 	for node, conn := range c.nodeConns {
-		if r, err1 := conn.ReadTextResult(); err1 != nil {
+		if r, err1 := conn.ReadResultset(false); err1 != nil {
 			err = err1
 			log.Error("node %s read text result error %s", node.name, err.Error())
 		} else {
@@ -131,7 +131,7 @@ func (c *ClientConn) handleSelect(data []byte) (err error) {
 	return
 }
 
-func (c *ClientConn) writeTextResult(result *mysql.TextResultPacket) error {
+func (c *ClientConn) writeTextResult(result *mysql.ResultsetPacket) error {
 	count := mysql.PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
 
 	data := make([]byte, 4, 1024)

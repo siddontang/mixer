@@ -30,7 +30,8 @@ type ColumnDefPacket struct {
 	DefaultValue string
 }
 
-type TextResultPacket struct {
+type ResultsetPacket struct {
+	binary     bool
 	ColumnDefs [][]byte
 	Rows       [][]byte
 }
