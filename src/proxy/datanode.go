@@ -64,13 +64,13 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	return dn
 }
 
-func (dn *DataNode) PopConn() (*mysql.Client, error) {
-	var c *mysql.Client
+func (dn *DataNode) PopConn() (*mysql.Conn, error) {
+	var c *mysql.Conn
 
 	dn.lock.Lock()
 	if v := dn.conns.Back(); v != nil {
 		dn.conns.Remove(v)
-		c = v.Value.(*mysql.Client)
+		c = v.Value.(*mysql.Conn)
 	}
 	dn.lock.Unlock()
 
@@ -81,7 +81,7 @@ func (dn *DataNode) PopConn() (*mysql.Client, error) {
 		}
 	}
 
-	c = mysql.NewClient()
+	c = mysql.NewConn()
 
 	if err := c.Connect(dn.addr, dn.user, dn.password, dn.db); err != nil {
 		log.Error("connect %s node error %s", dn.name, err.Error())
@@ -99,15 +99,15 @@ func (dn *DataNode) PopConn() (*mysql.Client, error) {
 	return c, nil
 }
 
-func (dn *DataNode) PushConn(c *mysql.Client) {
-	var closeConn *mysql.Client
+func (dn *DataNode) PushConn(c *mysql.Conn) {
+	var closeConn *mysql.Conn
 	dn.lock.Lock()
 
 	if dn.conns.Len() > dn.maxIdleConns {
 		oldConn := dn.conns.Front()
 		dn.conns.Remove(oldConn)
 
-		closeConn = oldConn.Value.(*mysql.Client)
+		closeConn = oldConn.Value.(*mysql.Conn)
 	}
 
 	dn.conns.PushBack(c)

@@ -68,7 +68,7 @@ func (c *ClientConn) routeQuery(data []byte) error {
 		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, err.Error())
 	}
 
-	var conn *mysql.Client
+	var conn *mysql.Conn
 	var ok bool
 	for node, query := range r {
 		if conn, ok = c.nodeConns[node]; !ok {

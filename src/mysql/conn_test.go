@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-var testClient *Client
-var testClientOnce sync.Once
+var testConn *Conn
+var testConnOnce sync.Once
 
-func newTestClient() *Client {
+func newTestConn() *Conn {
 	f := func() {
-		c := NewClient()
+		c := NewConn()
 
 		if err := c.Connect("10.20.135.213:3306", "qing", "admin", "mixer"); err != nil {
 			log.Error("%s", err.Error())
@@ -22,27 +22,27 @@ func newTestClient() *Client {
 			c.Close()
 		}
 
-		testClient = c
+		testConn = c
 	}
 
-	testClientOnce.Do(f)
+	testConnOnce.Do(f)
 
-	return testClient
+	return testConn
 }
 
-func TestClient_Connect(t *testing.T) {
-	newTestClient()
+func TestConn_Connect(t *testing.T) {
+	newTestConn()
 }
 
-func TestClient_Ping(t *testing.T) {
-	c := newTestClient()
+func TestConn_Ping(t *testing.T) {
+	c := newTestConn()
 
 	if err := c.Ping(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestClient_CreateTable(t *testing.T) {
+func TestConn_CreateTable(t *testing.T) {
 	s := `CREATE TABLE IF NOT EXISTS mixer_test (
           id BIGINT(64) UNSIGNED  NOT NULL,
           str VARCHAR(256),
@@ -51,17 +51,17 @@ func TestClient_CreateTable(t *testing.T) {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
-	c := newTestClient()
+	c := newTestConn()
 
 	if _, err := c.Exec(s); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestClient_Insert(t *testing.T) {
+func TestConn_Insert(t *testing.T) {
 	s := `insert into mixer_test (id, str, f, e) values(1, "a", 3.14, "test1")`
 
-	c := newTestClient()
+	c := newTestConn()
 
 	if pkg, err := c.Exec(s); err != nil {
 		t.Fatal(err)
@@ -72,10 +72,10 @@ func TestClient_Insert(t *testing.T) {
 	}
 }
 
-func TestClient_Select(t *testing.T) {
+func TestConn_Select(t *testing.T) {
 	s := `select str, f, e from mixer_test where id = 1`
 
-	c := newTestClient()
+	c := newTestConn()
 
 	if result, err := c.Query(s); err != nil {
 		t.Fatal(err)
@@ -90,8 +90,8 @@ func TestClient_Select(t *testing.T) {
 	}
 }
 
-func TestClient_FieldList(t *testing.T) {
-	c := newTestClient()
+func TestConn_FieldList(t *testing.T) {
+	c := newTestConn()
 
 	if result, err := c.FieldList("mixer_test", "st%"); err != nil {
 		t.Fatal(err)
@@ -102,8 +102,8 @@ func TestClient_FieldList(t *testing.T) {
 	}
 }
 
-func TestClient_DeleteTable(t *testing.T) {
-	c := newTestClient()
+func TestConn_DeleteTable(t *testing.T) {
+	c := newTestConn()
 
 	if _, err := c.Exec("drop table mixer_test"); err != nil {
 		t.Fatal(err)

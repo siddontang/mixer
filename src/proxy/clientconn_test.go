@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func newTestClient() *mysql.Client {
-	c := mysql.NewClient()
+func newTestClient() *mysql.Conn {
+	c := mysql.NewConn()
 
 	if err := c.Connect("127.0.0.1:3306", "qing", "admin", "mixer"); err != nil {
 		return nil
@@ -17,12 +17,12 @@ func newTestClient() *mysql.Client {
 	return c
 }
 
-var testMySQLClient *mysql.Client
-var testMySQLClientOnce sync.Once
+var testMySQLConn *mysql.Conn
+var testMySQLConnOnce sync.Once
 
-func newTestMySQLClient() *mysql.Client {
+func newTestMySQLConn() *mysql.Conn {
 	f := func() {
-		c := mysql.NewClient()
+		c := mysql.NewConn()
 
 		if err := c.Connect("10.20.135.213:3306", "qing", "admin", "mixer"); err != nil {
 			log.Error("%s", err.Error())
@@ -33,12 +33,12 @@ func newTestMySQLClient() *mysql.Client {
 			c.Close()
 		}
 
-		testMySQLClient = c
+		testMySQLConn = c
 	}
 
-	testMySQLClientOnce.Do(f)
+	testMySQLConnOnce.Do(f)
 
-	return testMySQLClient
+	return testMySQLConn
 }
 
 func TestClientConn_Handshake(t *testing.T) {
@@ -61,7 +61,7 @@ func TestClientConn_CreateTable(t *testing.T) {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
-	c := newTestMySQLClient()
+	c := newTestMySQLConn()
 
 	if _, err := c.Exec(s); err != nil {
 		t.Fatal(err)
@@ -196,7 +196,7 @@ func TestClientConn_Commit(t *testing.T) {
 }
 
 func TestClientConn_DeleteTable(t *testing.T) {
-	c := newTestMySQLClient()
+	c := newTestMySQLConn()
 
 	if _, err := c.Exec("drop table mixer_test_clientconn"); err != nil {
 		t.Fatal(err)

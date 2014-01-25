@@ -17,7 +17,7 @@ var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_F
 
 //client <-> proxy
 type ClientConn struct {
-	mysql.Conn
+	mysql.BaseConn
 
 	server *Server
 
@@ -33,7 +33,7 @@ type ClientConn struct {
 
 	schema *Schema
 
-	nodeConns map[*DataNode]*mysql.Client
+	nodeConns map[*DataNode]*mysql.Conn
 }
 
 var BaseConnectionId uint32 = 10000
@@ -43,7 +43,7 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 	conn.server = s
 
-	conn.NetConn = c
+	conn.Connection = c
 	conn.Sequence = 0
 
 	conn.connectionId = atomic.AddUint32(&BaseConnectionId, 1)
@@ -52,7 +52,7 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 	conn.salt, _ = mysql.RandomBuf(20)
 
-	conn.nodeConns = make(map[*DataNode]*mysql.Client)
+	conn.nodeConns = make(map[*DataNode]*mysql.Conn)
 
 	return conn
 }
@@ -82,7 +82,7 @@ func (c *ClientConn) Handshake() error {
 }
 
 func (c *ClientConn) Close() error {
-	c.NetConn.Close()
+	c.Connection.Close()
 
 	//connection closed but proxy connection may be in trans, cancel
 	for node, conn := range c.nodeConns {
