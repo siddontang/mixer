@@ -7,7 +7,7 @@ import (
 )
 
 type Stmt struct {
-	conn    *Conn
+	conn    *conn
 	id      uint32
 	query   string
 	columns uint16
@@ -22,12 +22,21 @@ func (s *Stmt) Exec(args ...interface{}) (*OKPacket, error) {
 	return s.conn.ReadOK()
 }
 
-func (s *Stmt) Query(args ...interface{}) (*ResultsetPacket, error) {
+func (s *Stmt) Query(args ...interface{}) (*Resultset, error) {
+	r, err := s.RawQuery(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Parse(true)
+}
+
+func (s *Stmt) RawQuery(args ...interface{}) (*ResultsetPacket, error) {
 	if err := s.write(args...); err != nil {
 		return nil, err
 	}
 
-	return s.conn.ReadResultset(true)
+	return s.conn.readResultset()
 }
 
 func (s *Stmt) Close() error {
@@ -45,10 +54,8 @@ func (s *Stmt) write(args ...interface{}) error {
 		return fmt.Errorf("argument mismatch, need %d but got %d", s.params, len(args))
 	}
 
-	s.conn.Sequence = 0
-
 	paramTypes := make([]byte, s.params<<1)
-	paramValues := make([][]byte, 0)
+	paramValues := make([][]byte, s.params)
 
 	//NULL-bitmap, length: (num-params+7)
 	nullBitmap := make([]byte, (s.params+7)>>3)
@@ -151,10 +158,12 @@ func (s *Stmt) write(args ...interface{}) error {
 		}
 	}
 
+	s.conn.Sequence = 0
+
 	return s.conn.WritePacket(data)
 }
 
-func (c *Conn) Prepare(query string) (*Stmt, error) {
+func (c *conn) Prepare(query string) (*Stmt, error) {
 	if s, ok := c.stmts[query]; ok {
 		return s, nil
 	}
@@ -169,7 +178,7 @@ func (c *Conn) Prepare(query string) (*Stmt, error) {
 	}
 
 	if data[0] == ERR_HEADER {
-		return nil, c.LoadError(data)
+		return nil, LoadError(data)
 	} else if data[0] != OK_HEADER {
 		return nil, ErrMalformPacket
 	}
@@ -192,7 +201,21 @@ func (c *Conn) Prepare(query string) (*Stmt, error) {
 	pos += 2
 
 	//warnings
-	//warningss = binary.LittleEndian.Uint16(data[pos:])
+	//warnings = binary.LittleEndian.Uint16(data[pos:])
+
+	if s.columns > 0 {
+		err = s.conn.readUntilEOF()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if s.params > 0 {
+		err = s.conn.readUntilEOF()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	c.stmts[query] = s
 

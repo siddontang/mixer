@@ -17,9 +17,11 @@ var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_F
 
 //client <-> proxy
 type ClientConn struct {
-	mysql.BaseConn
+	mysql.PacketIO
 
 	server *Server
+
+	capability uint32
 
 	connectionId uint32
 
@@ -33,26 +35,26 @@ type ClientConn struct {
 
 	schema *Schema
 
-	nodeConns map[*DataNode]*mysql.Conn
+	nodeConns map[*DataNode]mysql.Conn
 }
 
-var BaseConnectionId uint32 = 10000
+var BaseConnId uint32 = 10000
 
 func NewClientConn(s *Server, c net.Conn) *ClientConn {
 	conn := new(ClientConn)
 
 	conn.server = s
 
-	conn.Connection = c
+	conn.Conn = c
 	conn.Sequence = 0
 
-	conn.connectionId = atomic.AddUint32(&BaseConnectionId, 1)
+	conn.connectionId = atomic.AddUint32(&BaseConnId, 1)
 
 	conn.status = mysql.SERVER_STATUS_AUTOCOMMIT
 
 	conn.salt, _ = mysql.RandomBuf(20)
 
-	conn.nodeConns = make(map[*DataNode]*mysql.Conn)
+	conn.nodeConns = make(map[*DataNode]mysql.Conn)
 
 	return conn
 }
@@ -82,7 +84,7 @@ func (c *ClientConn) Handshake() error {
 }
 
 func (c *ClientConn) Close() error {
-	c.Connection.Close()
+	c.Conn.Close()
 
 	//connection closed but proxy connection may be in trans, cancel
 	for node, conn := range c.nodeConns {
@@ -97,7 +99,7 @@ func (c *ClientConn) Close() error {
 
 func (c *ClientConn) clearNodeConns() {
 	for n, v := range c.nodeConns {
-		n.PushConn(v)
+		v.Close()
 		delete(c.nodeConns, n)
 	}
 }
@@ -159,7 +161,7 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos := 0
 
 	//capability
-	c.Capability = binary.LittleEndian.Uint32(data[:4])
+	c.capability = binary.LittleEndian.Uint32(data[:4])
 	pos += 4
 
 	//skip max packet size
@@ -189,7 +191,7 @@ func (c *ClientConn) readHandshakeResponse() error {
 
 	pos += authLen
 
-	if c.Capability|mysql.CLIENT_CONNECT_WITH_DB > 0 {
+	if c.capability|mysql.CLIENT_CONNECT_WITH_DB > 0 {
 		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 

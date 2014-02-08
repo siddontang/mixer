@@ -3,6 +3,8 @@ package mysql
 import (
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/binary"
+	"fmt"
 	"io"
 )
 
@@ -99,6 +101,38 @@ func PutLengthEncodedInt(n uint64) []byte {
 	return nil
 }
 
+func LengthEnodedString(b []byte) ([]byte, bool, int, error) {
+	// Get length
+	num, isNull, n := LengthEncodedInt(b)
+	if num < 1 {
+		return nil, isNull, n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return b[n-int(num) : n], false, n, nil
+	}
+	return nil, false, n, io.EOF
+}
+
+func SkipLengthEnodedString(b []byte) (int, error) {
+	// Get length
+	num, _, n := LengthEncodedInt(b)
+	if num < 1 {
+		return n, nil
+	}
+
+	n += int(num)
+
+	// Check data length
+	if len(b) >= n {
+		return n, nil
+	}
+	return n, io.EOF
+}
+
 func Uint16ToBytes(n uint16) []byte {
 	return []byte{
 		byte(n),
@@ -126,4 +160,125 @@ func Uint64ToBytes(n uint64) []byte {
 		byte(n >> 48),
 		byte(n >> 56),
 	}
+}
+
+func FormatBinaryDate(n int, data []byte) (string, error) {
+	switch n {
+	case 0:
+		return "0000-00-00", nil
+	case 4:
+		return fmt.Sprintf("%04d-%02d-%02d",
+			binary.LittleEndian.Uint16(data[:2]),
+			data[2],
+			data[3]), nil
+	default:
+		return "", fmt.Errorf("invalid date packet length %d", n)
+	}
+}
+
+func FormatBinaryDateTime(n int, data []byte) (string, error) {
+	switch n {
+	case 0:
+		return "0000-00-00 00:00:00", nil
+	case 4:
+		return fmt.Sprintf("%04d-%02d-%02d 00:00:00",
+			binary.LittleEndian.Uint16(data[:2]),
+			data[2],
+			data[3]), nil
+	case 7:
+		return fmt.Sprintf(
+			"%04d-%02d-%02d %02d:%02d:%02d",
+			binary.LittleEndian.Uint16(data[:2]),
+			data[2],
+			data[3],
+			data[4],
+			data[5],
+			data[6]), nil
+	case 11:
+		return fmt.Sprintf(
+			"%04d-%02d-%02d %02d:%02d:%02d.%06d",
+			binary.LittleEndian.Uint16(data[:2]),
+			data[2],
+			data[3],
+			data[4],
+			data[5],
+			data[6],
+			binary.LittleEndian.Uint32(data[7:11])), nil
+	default:
+		return "", fmt.Errorf("invalid datetime packet length %d", n)
+	}
+}
+
+func FormatBinaryTime(n int, data []byte) (string, error) {
+	if n == 0 {
+		return "0000-00-00", nil
+	}
+
+	var sign byte
+	if data[0] == 1 {
+		sign = byte('-')
+	}
+
+	switch n {
+	case 8:
+		return fmt.Sprintf(
+			"%c%02d:%02d:%02d",
+			sign,
+			uint16(data[1])*24+uint16(data[5]),
+			data[6],
+			data[7],
+		), nil
+	case 12:
+		return fmt.Sprintf(
+			"%c%02d:%02d:%02d.%06d",
+			sign,
+			uint16(data[1])*24+uint16(data[5]),
+			data[6],
+			data[7],
+			binary.LittleEndian.Uint32(data[8:12]),
+		), nil
+	default:
+		return "", fmt.Errorf("invalid time packet length %d", n)
+	}
+}
+
+func Escape(sql string) string {
+	dest := make([]byte, 0, 2*len(sql))
+	var escape byte
+	for i := 0; i < len(sql); i++ {
+		c := sql[i]
+
+		escape = 0
+
+		switch c {
+		case 0: /* Must be escaped for 'mysql' */
+			escape = '0'
+			break
+		case '\n': /* Must be escaped for logs */
+			escape = 'n'
+			break
+		case '\r':
+			escape = 'r'
+			break
+		case '\\':
+			escape = '\\'
+			break
+		case '\'':
+			escape = '\''
+			break
+		case '"': /* Better safe than sorry */
+			escape = '"'
+			break
+		case '\032': /* This gives problems on Win32 */
+			escape = 'Z'
+		}
+
+		if escape != 0 {
+			dest = append(dest, '\\', escape)
+		} else {
+			dest = append(dest, c)
+		}
+	}
+
+	return string(dest)
 }

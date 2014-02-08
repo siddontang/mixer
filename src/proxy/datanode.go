@@ -1,11 +1,9 @@
 package proxy
 
 import (
-	"container/list"
 	"github.com/siddontang/golib/log"
 	"mysql"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -18,17 +16,11 @@ type DataNode struct {
 	server *Server
 	cfg    *Config
 
-	name     string
-	addr     string
-	user     string
-	password string
-	db       string
-	mode     byte
+	name string
 
-	maxIdleConns int
+	client *mysql.Client
 
-	lock  sync.Mutex
-	conns *list.List
+	mode byte
 
 	alive bool
 }
@@ -39,15 +31,9 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	dn.server = server
 	dn.cfg = server.cfg
 
-	dn.name = cfgNode.Name
-	dn.addr = cfgNode.Addr
-	dn.user = cfgNode.User
-	dn.password = cfgNode.Password
+	dn.client = mysql.NewClient(cfgNode.Addr, cfgNode.User, cfgNode.Password, cfgNode.DB, server.cfg.MaxIdleConns)
+
 	dn.db = cfgNode.DB
-
-	dn.maxIdleConns = server.cfg.MaxIdleConns
-
-	dn.conns = list.New()
 
 	switch strings.ToLower(cfgNode.Mode) {
 	case "master":
@@ -64,59 +50,8 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	return dn
 }
 
-func (dn *DataNode) PopConn() (*mysql.Conn, error) {
-	var c *mysql.Conn
-
-	dn.lock.Lock()
-	if v := dn.conns.Back(); v != nil {
-		dn.conns.Remove(v)
-		c = v.Value.(*mysql.Conn)
-	}
-	dn.lock.Unlock()
-
-	if c != nil {
-		if err := c.Ping(); err == nil {
-			//connection has alive
-			return c, nil
-		}
-	}
-
-	c = mysql.NewConn()
-
-	if err := c.Connect(dn.addr, dn.user, dn.password, dn.db); err != nil {
-		log.Error("connect %s node error %s", dn.name, err.Error())
-		return nil, err
-	}
-
-	//we must always use autocommit
-	if _, err := c.Exec("set autocommit = 1"); err != nil {
-		log.Error("set autocommit error %s", err.Error())
-		c.Close()
-
-		return nil, err
-	}
-
-	return c, nil
-}
-
-func (dn *DataNode) PushConn(c *mysql.Conn) {
-	var closeConn *mysql.Conn
-	dn.lock.Lock()
-
-	if dn.conns.Len() > dn.maxIdleConns {
-		oldConn := dn.conns.Front()
-		dn.conns.Remove(oldConn)
-
-		closeConn = oldConn.Value.(*mysql.Conn)
-	}
-
-	dn.conns.PushBack(c)
-
-	dn.lock.Unlock()
-
-	if closeConn != nil {
-		closeConn.Close()
-	}
+func (dn *DataNode) GetConn() (Conn, error) {
+	return dn.client.Get()
 }
 
 func (dn *DataNode) run() {
@@ -134,8 +69,8 @@ func (dn *DataNode) run() {
 	for {
 		select {
 		case <-t.C:
-			if c, err := dn.PopConn(); err != nil {
-				log.Error("pop conn error %s", err.Error())
+			if c, err := dn.GetConn(); err != nil {
+				log.Error("get conn error %s", err.Error())
 				errNum++
 			} else {
 				if err := c.Ping(); err != nil {
@@ -144,8 +79,8 @@ func (dn *DataNode) run() {
 				} else {
 					errNum = 0
 					dn.alive = true
-					dn.PushConn(c)
 				}
+				c.Close()
 			}
 
 			if errNum > 3 {

@@ -17,12 +17,12 @@ func newTestClient() *mysql.Conn {
 	return c
 }
 
-var testMySQLConn *mysql.Conn
+var testMySQLConn *mysql.MySQLConn
 var testMySQLConnOnce sync.Once
 
 func newTestMySQLConn() *mysql.Conn {
 	f := func() {
-		c := mysql.NewConn()
+		c := new(msyql.MySQLConn)
 
 		if err := c.Connect("10.20.135.213:3306", "qing", "admin", "mixer"); err != nil {
 			log.Error("%s", err.Error())
