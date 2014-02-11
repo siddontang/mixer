@@ -148,6 +148,7 @@ var stateMap = map[rune]stateFn{
 	']':  lexRBracket,
 	'{':  lexLBrace,
 	'}':  lexRBrace,
+	'\\': lexBackslash,
 	'0':  lexNumber0,
 	'1':  lexNumber,
 	'2':  lexNumber,
@@ -554,16 +555,22 @@ func lexRBrace(l *Lexer) stateFn {
 	return l.emit(TK_RBRACE)
 }
 
-func isAlphanumeric(r rune) bool {
-	return unicode.IsLetter(r) || unicode.IsNumber(r)
+func lexBackslash(l *Lexer) stateFn {
+	if l.next() == 'N' {
+		//shortcut for NULL
+		return l.emit(TK_SQL_NULL)
+	} else {
+		l.backup()
+		return l.emit(TK_BACKSLASH)
+	}
 }
 
 func isIdentifier(r rune) bool {
-	return isAlphanumeric(r) || r == '$' || r == '_'
+	return unicode.IsNumber(r) || unicode.IsLetter(r) || r == '$' || r == '_'
 }
 
 func isVariable(r rune) bool {
-	return isAlphanumeric(r) || r == '$' || r == '_' || r == '.'
+	return unicode.IsNumber(r) || unicode.IsLetter(r) || r == '$' || r == '_' || r == '.'
 }
 
 //get identifier type
