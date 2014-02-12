@@ -19,13 +19,7 @@ func (s *stmt) Exec(args ...interface{}) (*Result, error) {
 		return nil, err
 	}
 
-	if p, err := s.conn.ReadOK(); err != nil {
-		return nil, err
-	} else {
-		//todo, for strict_mode treat warning as error
-		return &Result{Status: p.Status, InsertId: p.LastInsertId,
-			AffectedRows: p.AffectedRows}, nil
-	}
+	return s.conn.readOK()
 }
 
 func (s *stmt) Query(args ...interface{}) (*Resultset, error) {
@@ -173,7 +167,7 @@ func (c *conn) Prepare(query string) (*stmt, error) {
 	}
 
 	if data[0] == ERR_HEADER {
-		return nil, LoadError(data)
+		return nil, c.handleErrorPacket(data)
 	} else if data[0] != OK_HEADER {
 		return nil, ErrMalformPacket
 	}

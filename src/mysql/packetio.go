@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -104,38 +103,5 @@ func (c *PacketIO) WritePacket(data []byte) error {
 	} else {
 		c.Sequence++
 		return nil
-	}
-}
-
-func (c *PacketIO) WriteOK(pkg *OKPacket) error {
-	data := DumpOK(pkg)
-
-	return c.WritePacket(data)
-}
-
-func (c *PacketIO) WriteError(e error) error {
-	data := DumpError(e)
-
-	return c.WritePacket(data)
-}
-
-func (c *PacketIO) WriteEOF(pkg *EOFPacket) error {
-	data := DumpEOF(pkg)
-
-	return c.WritePacket(data)
-}
-
-func (c *PacketIO) ReadOK() (*OKPacket, error) {
-	data, err := c.ReadPacket()
-	if err != nil {
-		return nil, err
-	}
-
-	if data[0] == OK_HEADER {
-		return LoadOK(data), nil
-	} else if data[0] == ERR_HEADER {
-		return nil, LoadError(data)
-	} else {
-		return nil, errors.New("invalid ok packet")
 	}
 }

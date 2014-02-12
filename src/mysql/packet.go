@@ -17,41 +17,6 @@ type EOFPacket struct {
 	Warnings uint16
 }
 
-type ResultsetPacket struct {
-	Status uint16
-	Fields []FieldPacket
-	Rows   []RowPacket
-}
-
-func (p *ResultsetPacket) Parse(binary bool) (*Resultset, error) {
-	r := new(Resultset)
-
-	r.Status = p.Status
-
-	r.Fields = make([]Field, len(p.Fields))
-	r.FieldNames = make(map[string]int, len(p.Fields))
-
-	var err error
-	for i := range r.Fields {
-		r.Fields[i], err = p.Fields[i].Parse()
-		if err != nil {
-			return nil, err
-		}
-
-		r.FieldNames[string(r.Fields[i].Name)] = i
-	}
-
-	r.Data = make([][]interface{}, len(p.Rows))
-	for i := range r.Data {
-		r.Data[i], err = p.Rows[i].Parse(r.Fields, binary)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return r, nil
-}
-
 func DumpOK(pkg *OKPacket) []byte {
 	data := make([]byte, 4, 32+len(pkg.Info))
 

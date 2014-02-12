@@ -70,7 +70,7 @@ func (c *conn) ReConnect() error {
 		return err
 	}
 
-	if _, err := c.ReadOK(); err != nil {
+	if _, err := c.readOK(); err != nil {
 		errLog("read ok error %s", err.Error())
 		c.Conn.Close()
 
@@ -296,7 +296,7 @@ func (c *conn) Ping() error {
 			return err
 		}
 
-		if _, err := c.ReadOK(); err != nil {
+		if _, err := c.readOK(); err != nil {
 			return err
 		}
 	}
@@ -308,13 +308,7 @@ func (c *conn) Ping() error {
 
 func (c *conn) Exec(command string, args ...interface{}) (*Result, error) {
 	if len(args) == 0 {
-		if p, err := c.exec(command); err != nil {
-			return nil, err
-		} else {
-			//todo, for strict_mode treat warning as error
-			return &Result{Status: p.Status, InsertId: p.LastInsertId,
-				AffectedRows: p.AffectedRows}, nil
-		}
+		return c.exec(command)
 	} else {
 		if s, err := c.Prepare(command); err != nil {
 			return nil, err
@@ -327,12 +321,12 @@ func (c *conn) Exec(command string, args ...interface{}) (*Result, error) {
 	}
 }
 
-func (c *conn) exec(query string) (*OKPacket, error) {
+func (c *conn) exec(query string) (*Result, error) {
 	if err := c.WriteCommandStr(COM_QUERY, query); err != nil {
 		return nil, err
 	}
 
-	return c.ReadOK()
+	return c.readOK()
 }
 
 func (c *conn) Begin() error {
@@ -360,7 +354,7 @@ func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
 		return nil, err
 	}
 
-	columns := make([]FieldPacket, 0)
+	columns := make([]fieldPacket, 0)
 
 	if data[0] == ERR_HEADER {
 		return nil, LoadError(data)
@@ -423,19 +417,19 @@ func (c *conn) query(query string) (*Resultset, error) {
 	}
 }
 
-func (c *conn) readResultset() (*ResultsetPacket, error) {
+func (c *conn) readResultset() (*resultsetPacket, error) {
 	data, err := c.ReadPacket()
 	if err != nil {
 		return nil, err
 	}
 
-	result := new(ResultsetPacket)
+	result := new(resultsetPacket)
 
 	switch data[0] {
 	case OK_HEADER:
 		return result, nil
 	case ERR_HEADER:
-		return nil, LoadError(data)
+		return nil, c.handleErrorPacket(data)
 	case LocalInFile_HEADER:
 		return nil, ErrMalformPacket
 	}
@@ -447,8 +441,8 @@ func (c *conn) readResultset() (*ResultsetPacket, error) {
 		return nil, ErrMalformPacket
 	}
 
-	result.Fields = make([]FieldPacket, count)
-	result.Rows = make([]RowPacket, 0)
+	result.Fields = make([]fieldPacket, count)
+	result.Rows = make([]rowPacket, 0)
 
 	if err := c.readResultColumns(result); err != nil {
 		return nil, err
@@ -461,7 +455,7 @@ func (c *conn) readResultset() (*ResultsetPacket, error) {
 	return result, nil
 }
 
-func (c *conn) readResultColumns(result *ResultsetPacket) (err error) {
+func (c *conn) readResultColumns(result *resultsetPacket) (err error) {
 	var i int = 0
 	var data []byte
 
@@ -472,7 +466,7 @@ func (c *conn) readResultColumns(result *ResultsetPacket) (err error) {
 		}
 
 		// EOF Packet
-		if data[0] == EOF_HEADER && len(data) <= 5 {
+		if c.isEOFPacket(data) {
 			if i != len(result.Fields) {
 				errLog("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
 				err = ErrMalformPacket
@@ -487,7 +481,7 @@ func (c *conn) readResultColumns(result *ResultsetPacket) (err error) {
 	}
 }
 
-func (c *conn) readResultRows(result *ResultsetPacket) (err error) {
+func (c *conn) readResultRows(result *resultsetPacket) (err error) {
 	var data []byte
 
 	for {
@@ -498,7 +492,7 @@ func (c *conn) readResultRows(result *ResultsetPacket) (err error) {
 		}
 
 		// EOF Packet
-		if data[0] == EOF_HEADER && len(data) <= 5 {
+		if c.isEOFPacket(data) {
 			if c.capability&CLIENT_PROTOCOL_41 > 0 {
 				//result.Warnings = binary.LittleEndian.Uint16(data[1:])
 				//todo add strict_mode, warning will be treat as error
@@ -523,9 +517,72 @@ func (c *conn) readUntilEOF() (err error) {
 		}
 
 		// EOF Packet
-		if data[0] == EOF_HEADER && len(data) <= 5 {
+		if c.isEOFPacket(data) {
 			return
 		}
 	}
 	return
+}
+
+func (c *conn) isEOFPacket(data []byte) bool {
+	return data[0] == EOF_HEADER && len(data) <= 5
+}
+
+func (c *conn) handleOKPacket(data []byte) (*Result, error) {
+	var n int
+	var pos int = 1
+
+	r := new(Result)
+
+	r.AffectedRows, _, n = LengthEncodedInt(data[pos:])
+	pos += n
+	r.InsertId, _, n = LengthEncodedInt(data[pos:])
+	pos += n
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		r.Status = binary.LittleEndian.Uint16(data[pos:])
+		pos += 2
+
+		//todo:strict_mode, check warnings as error
+		//Warnings := binary.LittleEndian.Uint16(data[pos:])
+		//pos += 2
+	}
+
+	//info
+	return r, nil
+}
+
+func (c *conn) handleErrorPacket(data []byte) error {
+	e := new(MySQLError)
+
+	var pos int = 1
+
+	e.Code = binary.LittleEndian.Uint16(data[pos:])
+	pos += 2
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		//skip '#'
+		pos++
+		e.State = string(data[pos : pos+5])
+		pos += 5
+	}
+
+	e.Message = string(data[pos:])
+
+	return e
+}
+
+func (c *conn) readOK() (*Result, error) {
+	data, err := c.ReadPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	if data[0] == OK_HEADER {
+		return c.handleOKPacket(data)
+	} else if data[0] == ERR_HEADER {
+		return nil, c.handleErrorPacket(data)
+	} else {
+		return nil, errors.New("invalid ok packet")
+	}
 }

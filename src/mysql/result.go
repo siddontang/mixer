@@ -24,9 +24,9 @@ type Field struct {
 	DefaultValue       []byte
 }
 
-type FieldPacket []byte
+type fieldPacket []byte
 
-func (p FieldPacket) Parse() (f Field, err error) {
+func (p fieldPacket) Parse() (f Field, err error) {
 	var n int
 	pos := 0
 	//skip catelog, always def
@@ -114,9 +114,9 @@ func (p FieldPacket) Parse() (f Field, err error) {
 	return
 }
 
-type RowPacket []byte
+type rowPacket []byte
 
-func (p RowPacket) Parse(f []Field, binary bool) ([]interface{}, error) {
+func (p rowPacket) Parse(f []Field, binary bool) ([]interface{}, error) {
 	if binary {
 		return p.ParseBinary(f)
 	} else {
@@ -124,7 +124,7 @@ func (p RowPacket) Parse(f []Field, binary bool) ([]interface{}, error) {
 	}
 }
 
-func (p RowPacket) ParseText(f []Field) ([]interface{}, error) {
+func (p rowPacket) ParseText(f []Field) ([]interface{}, error) {
 	data := make([]interface{}, len(f))
 
 	var err error
@@ -169,7 +169,7 @@ func (p RowPacket) ParseText(f []Field) ([]interface{}, error) {
 	return data, nil
 }
 
-func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
+func (p rowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 	data := make([]interface{}, len(f))
 
 	if p[0] != OK_HEADER {
@@ -321,6 +321,41 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 	}
 
 	return data, nil
+}
+
+type resultsetPacket struct {
+	Status uint16
+	Fields []fieldPacket
+	Rows   []rowPacket
+}
+
+func (p *resultsetPacket) Parse(binary bool) (*Resultset, error) {
+	r := new(Resultset)
+
+	r.Status = p.Status
+
+	r.Fields = make([]Field, len(p.Fields))
+	r.FieldNames = make(map[string]int, len(p.Fields))
+
+	var err error
+	for i := range r.Fields {
+		r.Fields[i], err = p.Fields[i].Parse()
+		if err != nil {
+			return nil, err
+		}
+
+		r.FieldNames[string(r.Fields[i].Name)] = i
+	}
+
+	r.Data = make([][]interface{}, len(p.Rows))
+	for i := range r.Data {
+		r.Data[i], err = p.Rows[i].Parse(r.Fields, binary)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return r, nil
 }
 
 type Resultset struct {
