@@ -259,7 +259,7 @@ func TestStmt_Signed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(4, int8(-128)); err != nil {
+	if _, err := s.Exec(uint64(18446744073709551516), int8(-128)); err != nil {
 		t.Fatal(err)
 	}
 
