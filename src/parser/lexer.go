@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -601,4 +603,14 @@ func Tokenizer(input string) ([]Token, error) {
 	}
 
 	return ts, nil
+}
+
+var (
+	errLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
+)
+
+func errLog(format string, args ...interface{}) {
+	f := fmt.Sprintf("[Error] [mixer.parser] %s", format)
+	s := fmt.Sprintf(f, args...)
+	errLogger.Output(2, s)
 }
