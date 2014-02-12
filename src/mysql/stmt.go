@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-type Stmt struct {
+type stmt struct {
 	conn    *conn
 	id      uint32
 	query   string
@@ -14,34 +14,33 @@ type Stmt struct {
 	params  uint16
 }
 
-func (s *Stmt) Exec(args ...interface{}) (*OKPacket, error) {
+func (s *stmt) Exec(args ...interface{}) (*Result, error) {
 	if err := s.write(args...); err != nil {
 		return nil, err
 	}
 
-	return s.conn.ReadOK()
-}
-
-func (s *Stmt) Query(args ...interface{}) (*Resultset, error) {
-	r, err := s.RawQuery(args...)
-	if err != nil {
+	if p, err := s.conn.ReadOK(); err != nil {
 		return nil, err
+	} else {
+		//todo, for strict_mode treat warning as error
+		return &Result{Status: p.Status, InsertId: p.LastInsertId,
+			AffectedRows: p.AffectedRows}, nil
 	}
-
-	return r.Parse(true)
 }
 
-func (s *Stmt) RawQuery(args ...interface{}) (*ResultsetPacket, error) {
+func (s *stmt) Query(args ...interface{}) (*Resultset, error) {
 	if err := s.write(args...); err != nil {
 		return nil, err
 	}
 
-	return s.conn.readResultset()
+	if r, err := s.conn.readResultset(); err != nil {
+		return nil, err
+	} else {
+		return r.Parse(true)
+	}
 }
 
-func (s *Stmt) Close() error {
-	delete(s.conn.stmts, s.query)
-
+func (s *stmt) Close() error {
 	if err := s.conn.WriteCommandUint32(COM_STMT_CLOSE, s.id); err != nil {
 		return err
 	}
@@ -49,7 +48,7 @@ func (s *Stmt) Close() error {
 	return nil
 }
 
-func (s *Stmt) write(args ...interface{}) error {
+func (s *stmt) write(args ...interface{}) error {
 	if len(args) != int(s.params) {
 		return fmt.Errorf("argument mismatch, need %d but got %d", s.params, len(args))
 	}
@@ -163,11 +162,7 @@ func (s *Stmt) write(args ...interface{}) error {
 	return s.conn.WritePacket(data)
 }
 
-func (c *conn) Prepare(query string) (*Stmt, error) {
-	if s, ok := c.stmts[query]; ok {
-		return s, nil
-	}
-
+func (c *conn) Prepare(query string) (*stmt, error) {
 	if err := c.WriteCommandStr(COM_STMT_PREPARE, query); err != nil {
 		return nil, err
 	}
@@ -183,7 +178,7 @@ func (c *conn) Prepare(query string) (*Stmt, error) {
 		return nil, ErrMalformPacket
 	}
 
-	s := new(Stmt)
+	s := new(stmt)
 	s.conn = c
 
 	pos := 1
@@ -216,8 +211,6 @@ func (c *conn) Prepare(query string) (*Stmt, error) {
 			return nil, err
 		}
 	}
-
-	c.stmts[query] = s
 
 	return s, nil
 }

@@ -8,9 +8,20 @@ import (
 )
 
 type Field struct {
-	Name string
-	Type uint8
-	Flag uint16
+	Schema       []byte
+	Table        []byte
+	OrgTable     []byte
+	Name         []byte
+	OrgName      []byte
+	Charset      uint16
+	ColumnLength uint32
+	Type         uint8
+	Flag         uint16
+	Decimal      uint8
+
+	//below if command was fieldlist
+	DefaultValueLength uint64
+	DefaultValue       []byte
 }
 
 type FieldPacket []byte
@@ -25,57 +36,80 @@ func (p FieldPacket) Parse() (f Field, err error) {
 	}
 	pos += n
 
-	//skip schema
-	n, err = SkipLengthEnodedString(p[pos:])
+	//schema
+	f.Schema, _, n, err = LengthEnodedString(p[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
-	//skip table
-	n, err = SkipLengthEnodedString(p[pos:])
+	//table
+	f.Table, _, n, err = LengthEnodedString(p[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
-	//skip org_table
-	n, err = SkipLengthEnodedString(p[pos:])
+	//org_table
+	f.OrgTable, _, n, err = LengthEnodedString(p[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
 	//name
-	var name []byte
-	name, _, n, err = LengthEnodedString(p[pos:])
-	if err != nil {
-		return
-	}
-	f.Name = string(name)
-	pos += n
-
-	//skip org_name
-	n, err = SkipLengthEnodedString(p[pos:])
+	f.Name, _, n, err = LengthEnodedString(p[pos:])
 	if err != nil {
 		return
 	}
 	pos += n
 
-	//skip oc, charset and column length
-	pos += 1 + 2 + 4
+	//org_name
+	f.OrgName, _, n, err = LengthEnodedString(p[pos:])
+	if err != nil {
+		return
+	}
+	pos += n
 
+	//skip oc
+	pos += 1
+
+	//charset
+	f.Charset = binary.LittleEndian.Uint16(p[pos:])
+	pos += 2
+
+	//column length
+	f.ColumnLength = binary.LittleEndian.Uint32(p[pos:])
+	pos += 4
+
+	//type
 	f.Type = p[pos]
 	pos++
 
+	//flag
 	f.Flag = binary.LittleEndian.Uint16(p[pos:])
 	pos += 2
 
 	//decimals 1
+	f.Decimal = p[pos]
+	pos++
+
 	//filter [0x00][0x00]
+	pos += 2
 	//if more data, command was field list
-	//length of default value lenenc-int
-	//default value string[$len]
+	if pos < len(p) {
+		//length of default value lenenc-int
+		f.DefaultValueLength, _, n = LengthEncodedInt(p[pos:])
+		pos += n
+
+		if pos+int(f.DefaultValueLength) > len(p) {
+			err = ErrMalformPacket
+			return
+		}
+
+		//default value string[$len]
+		f.DefaultValue = p[pos:(pos + int(f.DefaultValueLength))]
+	}
 
 	return
 }
@@ -123,7 +157,7 @@ func (p RowPacket) ParseText(f []Field) ([]interface{}, error) {
 			case MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE:
 				data[i], err = strconv.ParseFloat(string(v), 64)
 			default:
-				data[i] = string(v)
+				data[i] = v
 			}
 
 			if err != nil {
@@ -150,7 +184,6 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 	var isNull bool
 	var n int
 	var err error
-	var s string
 	var v []byte
 	for i := range data {
 		if nullBitmap[(i+2)/8]&(1<<(uint(i+2)%8)) > 0 {
@@ -222,7 +255,7 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 			}
 
 			if !isNull {
-				data[i] = string(v)
+				data[i] = v
 				continue
 			} else {
 				data[i] = nil
@@ -239,14 +272,12 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 				continue
 			}
 
-			s, err = FormatBinaryDate(int(num), p[pos:])
+			data[i], err = FormatBinaryDate(int(num), p[pos:])
 			pos += int(num)
 
 			if err != nil {
 				return nil, err
 			}
-
-			data[i] = s
 
 		case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_DATETIME:
 			var num uint64
@@ -259,14 +290,12 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 				continue
 			}
 
-			s, err = FormatBinaryDateTime(int(num), p[pos:])
+			data[i], err = FormatBinaryDateTime(int(num), p[pos:])
 			pos += int(num)
 
 			if err != nil {
 				return nil, err
 			}
-
-			data[i] = s
 
 		case MYSQL_TYPE_TIME:
 			var num uint64
@@ -279,14 +308,12 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 				continue
 			}
 
-			s, err = FormatBinaryTime(int(num), p[pos:])
+			data[i], err = FormatBinaryTime(int(num), p[pos:])
 			pos += int(num)
 
 			if err != nil {
 				return nil, err
 			}
-
-			data[i] = s
 
 		default:
 			return nil, fmt.Errorf("Stmt Unknown FieldType %d %s", f[i].Type, f[i].Name)
@@ -297,10 +324,16 @@ func (p RowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 }
 
 type Resultset struct {
+	Status uint16 //server status for this query resultset
+
 	Fields     []Field
 	FieldNames map[string]int
 
 	Data [][]interface{}
+}
+
+func (r *Resultset) GetStatus() uint16 {
+	return r.Status
 }
 
 func (r *Resultset) RowNumber() int {
@@ -337,7 +370,7 @@ func (r *Resultset) IsNull(row, column int) (bool, error) {
 		return false, err
 	}
 
-	return d != nil, nil
+	return d == nil, nil
 }
 
 func (r *Resultset) IsNullByName(row int, name string) (bool, error) {
@@ -440,4 +473,22 @@ func (r *Resultset) GetStringByName(row int, name string) (string, error) {
 	} else {
 		return "", fmt.Errorf("invalid field name %s", name)
 	}
+}
+
+type Result struct {
+	Status       uint16
+	InsertId     uint64
+	AffectedRows uint64
+}
+
+func (r *Result) GetStatus() uint16 {
+	return r.Status
+}
+
+func (r *Result) LastInsertId() (int64, error) {
+	return int64(r.InsertId), nil
+}
+
+func (r *Result) RowsAffected() (int64, error) {
+	return int64(r.AffectedRows), nil
 }

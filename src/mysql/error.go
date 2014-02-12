@@ -1,7 +1,17 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"os"
+)
+
+var (
+	ErrBadConn       = errors.New("connection was bad")
+	ErrMalformPacket = errors.New("Malform packet error")
+
+	ErrTxDone = errors.New("sql: Transaction has already been committed or rolled back")
 )
 
 type MySQLError struct {
@@ -47,4 +57,14 @@ func NewError(errCode uint16, message string) *MySQLError {
 	e.Message = message
 
 	return e
+}
+
+var (
+	errLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
+)
+
+func errLog(format string, args ...interface{}) {
+	f := fmt.Sprintf("[Error] [mixer.mysql] %s", format)
+	s := fmt.Sprintf(f, args...)
+	errLogger.Output(2, s)
 }

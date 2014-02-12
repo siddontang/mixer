@@ -18,13 +18,15 @@ type EOFPacket struct {
 }
 
 type ResultsetPacket struct {
-	EOFPacket
+	Status uint16
 	Fields []FieldPacket
 	Rows   []RowPacket
 }
 
 func (p *ResultsetPacket) Parse(binary bool) (*Resultset, error) {
 	r := new(Resultset)
+
+	r.Status = p.Status
 
 	r.Fields = make([]Field, len(p.Fields))
 	r.FieldNames = make(map[string]int, len(p.Fields))
@@ -36,7 +38,7 @@ func (p *ResultsetPacket) Parse(binary bool) (*Resultset, error) {
 			return nil, err
 		}
 
-		r.FieldNames[r.Fields[i].Name] = i
+		r.FieldNames[string(r.Fields[i].Name)] = i
 	}
 
 	r.Data = make([][]interface{}, len(p.Rows))

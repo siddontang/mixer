@@ -4,12 +4,31 @@ import (
 	"testing"
 )
 
+func TestStmt_DropTable(t *testing.T) {
+	str := `drop table if exists mixer_test_stmt`
+
+	c := newTestConn()
+
+	s, err := c.Prepare(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Exec(); err != nil {
+		t.Fatal(err)
+	}
+
+	s.Close()
+}
+
 func TestStmt_CreateTable(t *testing.T) {
 	str := `CREATE TABLE IF NOT EXISTS mixer_test_stmt (
           id BIGINT(64) UNSIGNED  NOT NULL,
           str VARCHAR(256),
           f DOUBLE,
           e enum("test1", "test2"),
+          u tinyint unsigned,
+          i tinyint,
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
@@ -122,19 +141,168 @@ func TestStmt_Select(t *testing.T) {
 	s.Close()
 }
 
-func TestStmt_DropTable(t *testing.T) {
-	str := `drop table mixer_test_stmt`
+func TestStmt_NULL(t *testing.T) {
+	str := `insert into mixer_test_stmt (id, str, f, e) values (?, ?, ?, ?)`
 
 	c := newTestConn()
+	defer c.Close()
+
+	s, err := c.Prepare(str)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pkg, err := s.Exec(2, nil, 3.14, nil); err != nil {
+		t.Fatal(err)
+	} else {
+		if pkg.AffectedRows != 1 {
+			t.Fatal(pkg.AffectedRows)
+		}
+	}
+
+	s.Close()
+
+	str = `select * from mixer_test_stmt where id = ?`
+	s, err = c.Prepare(str)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r, err := s.Query(2); err != nil {
+		t.Fatal(err)
+	} else {
+		if b, err := r.IsNullByName(0, "id"); err != nil {
+			t.Fatal(err)
+		} else if b == true {
+			t.Fatal(b)
+		}
+
+		if b, err := r.IsNullByName(0, "str"); err != nil {
+			t.Fatal(err)
+		} else if b == false {
+			t.Fatal(b)
+		}
+
+		if b, err := r.IsNullByName(0, "f"); err != nil {
+			t.Fatal(err)
+		} else if b == true {
+			t.Fatal(b)
+		}
+
+		if b, err := r.IsNullByName(0, "e"); err != nil {
+			t.Fatal(err)
+		} else if b == false {
+			t.Fatal(b)
+		}
+	}
+
+	s.Close()
+}
+
+func TestStmt_Unsigned(t *testing.T) {
+	str := `insert into mixer_test_stmt (id, u) values (?, ?)`
+
+	c := newTestConn()
+	defer c.Close()
+
+	s, err := c.Prepare(str)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pkg, err := s.Exec(3, uint8(255)); err != nil {
+		t.Fatal(err)
+	} else {
+		if pkg.AffectedRows != 1 {
+			t.Fatal(pkg.AffectedRows)
+		}
+	}
+
+	s.Close()
+
+	str = `select u from mixer_test_stmt where id = ?`
+
+	s, err = c.Prepare(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if r, err := s.Query(3); err != nil {
+		t.Fatal(err)
+	} else {
+		if u, err := r.GetUint(0, 0); err != nil {
+			t.Fatal(err)
+		} else if u != uint64(255) {
+			t.Fatal(u)
+		}
+	}
+
+	s.Close()
+}
+
+func TestStmt_Signed(t *testing.T) {
+	str := `insert into mixer_test_stmt (id, i) values (?, ?)`
+
+	c := newTestConn()
+	defer c.Close()
+
+	s, err := c.Prepare(str)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Exec(3, 255); err == nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Exec(4, int8(-128)); err != nil {
+		t.Fatal(err)
+	}
+
+	s.Close()
+
+}
+
+func TestStmt_Trans(t *testing.T) {
+	c := newTestConn()
+	defer c.Close()
+
+	if _, err := c.Exec(`insert into mixer_test_stmt (id, str) values (1002, "abc")`); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Begin(); err != nil {
+		t.Fatal(err)
+	}
+
+	str := `select str from mixer_test_stmt where id = ?`
 
 	s, err := c.Prepare(str)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(); err != nil {
+	if _, err := s.Query(1002); err != nil {
 		t.Fatal(err)
 	}
 
-	s.Close()
+	if err := c.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if r, err := s.Query(1002); err != nil {
+		t.Fatal(err)
+	} else {
+		if str, _ := r.GetString(0, 0); str != `abc` {
+			t.Fatal(str)
+		}
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

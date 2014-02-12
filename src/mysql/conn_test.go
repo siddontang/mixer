@@ -1,22 +1,14 @@
 package mysql
 
 import (
-	"sync"
+	"fmt"
 	"testing"
 )
 
-var testClientOnce sync.Once
-var testClient *Client
+func newTestConn() *conn {
+	c := new(conn)
 
-func newTestConn() Conn {
-	f := func() {
-		testClient = NewClient("127.0.0.1:3306", "qing", "admin", "mixer", 16)
-	}
-
-	testClientOnce.Do(f)
-
-	c, err := testClient.Get()
-	if err != nil {
+	if err := c.Connect("127.0.0.1:3306", "qing", "admin", "mixer"); err != nil {
 		panic(err)
 	}
 
@@ -37,8 +29,17 @@ func TestConn_Ping(t *testing.T) {
 	}
 }
 
+func TestConn_DeleteTable(t *testing.T) {
+	c := newTestConn()
+	defer c.Close()
+
+	if _, err := c.Exec("drop table if exists mixer_test_conn"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestConn_CreateTable(t *testing.T) {
-	s := `CREATE TABLE IF NOT EXISTS mixer_test (
+	s := `CREATE TABLE IF NOT EXISTS mixer_test_conn (
           id BIGINT(64) UNSIGNED  NOT NULL,
           str VARCHAR(256),
           f DOUBLE,
@@ -55,7 +56,7 @@ func TestConn_CreateTable(t *testing.T) {
 }
 
 func TestConn_Insert(t *testing.T) {
-	s := `insert into mixer_test (id, str, f, e) values(1, "a", 3.14, "test1")`
+	s := `insert into mixer_test_conn (id, str, f, e) values(1, "a", 3.14, "test1")`
 
 	c := newTestConn()
 	defer c.Close()
@@ -70,7 +71,7 @@ func TestConn_Insert(t *testing.T) {
 }
 
 func TestConn_Select(t *testing.T) {
-	s := `select str, f, e from mixer_test where id = 1`
+	s := `select str, f, e from mixer_test_conn where id = 1`
 
 	c := newTestConn()
 	defer c.Close()
@@ -117,20 +118,40 @@ func TestConn_FieldList(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if result, err := c.FieldList("mixer_test", "st%"); err != nil {
+	if result, err := c.FieldList("mixer_test_conn", "st%"); err != nil {
 		t.Fatal(err)
 	} else {
 		if len(result) != 1 {
 			t.Fatal(len(result))
 		}
+
+		if string(result[0].Name) != `str` {
+			t.Fatal(string(result[0].Name))
+		}
 	}
 }
 
-func TestConn_DeleteTable(t *testing.T) {
+func TestConn_Escape(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if _, err := c.Exec("drop table mixer_test"); err != nil {
+	e := `""''\abc`
+	s := fmt.Sprintf(`insert into mixer_test_conn (id, str) values(5, "%s")`,
+		Escape(e))
+
+	if _, err := c.Exec(s); err != nil {
 		t.Fatal(err)
 	}
+
+	s = `select str from mixer_test_conn where id = ?`
+
+	if r, err := c.Query(s, 5); err != nil {
+		t.Fatal(err)
+	} else {
+		str, _ := r.GetString(0, 0)
+		if str != e {
+			t.Fatal(str)
+		}
+	}
+
 }

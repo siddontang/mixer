@@ -4,30 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/siddontang/golib/log"
+	"fmt"
 	"net"
 	"time"
 )
 
 var (
-	PingPeriod         = int64(time.Second * 60)
-	ErrProtocolVersion = errors.New("invalid protocol version, only support >= 10")
-	ErrLocalInFile     = errors.New("not support for local in file")
+	pingPeriod = int64(time.Second * 30)
 )
-
-type Conn interface {
-	Close() error
-	Exec(query string) (*OKPacket, error)
-	Query(query string) (*Resultset, error)
-	RawQuery(query string) (*ResultsetPacket, error)
-	Ping() error
-	Begin() (*OKPacket, error)
-	Commit() (*OKPacket, error)
-	Rollback() (*OKPacket, error)
-	Prepare(query string) (*Stmt, error)
-	FieldList(table, fieldWildcard string) ([]Field, error)
-	RawFieldList(table, fieldWildcard string) ([]FieldPacket, error)
-}
 
 //proxy <-> mysql server
 type conn struct {
@@ -45,8 +29,6 @@ type conn struct {
 	salt    []byte
 
 	lastPing int64
-
-	stmts map[string]*Stmt
 }
 
 func (c *conn) Connect(addr string, user string, password string, db string) error {
@@ -58,8 +40,6 @@ func (c *conn) Connect(addr string, user string, password string, db string) err
 	//use utf8
 	c.charset = DEFAULT_UTF8_CHARSET
 
-	c.stmts = make(map[string]*Stmt)
-
 	return c.ReConnect()
 }
 
@@ -70,7 +50,7 @@ func (c *conn) ReConnect() error {
 
 	netConn, err := net.Dial("tcp", c.addr)
 	if err != nil {
-		log.Error("connect %s error %s", c.addr, err.Error())
+		errLog("connect %s error %s", c.addr, err.Error())
 		return err
 	}
 
@@ -78,20 +58,20 @@ func (c *conn) ReConnect() error {
 	c.Sequence = 0
 
 	if err := c.readInitialHandshake(); err != nil {
-		log.Error("read initial handshake error %s", err.Error())
+		errLog("read initial handshake error %s", err.Error())
 		c.Conn.Close()
 		return err
 	}
 
 	if err := c.writeAuthHandshake(); err != nil {
-		log.Error("write auth handshake error %s", err.Error())
+		errLog("write auth handshake error %s", err.Error())
 		c.Conn.Close()
 
 		return err
 	}
 
 	if _, err := c.ReadOK(); err != nil {
-		log.Error("read ok error %s", err.Error())
+		errLog("read ok error %s", err.Error())
 		c.Conn.Close()
 
 		return err
@@ -121,8 +101,9 @@ func (c *conn) readInitialHandshake() error {
 	}
 
 	if data[0] < MinProtocolVersion {
-		log.Error("invalid protocol version %d", data[0])
-		return ErrProtocolVersion
+		err := fmt.Errorf("invalid protocol version %d, must >= 10", data[0])
+		errLog(err.Error())
+		return err
 	}
 
 	//skip mysql version and connection id
@@ -310,7 +291,7 @@ func (c *conn) WriteCommandStrStr(command byte, arg1 string, arg2 string) error 
 func (c *conn) Ping() error {
 	n := time.Now().Unix()
 
-	if n-c.lastPing > PingPeriod {
+	if n-c.lastPing > pingPeriod {
 		if err := c.WriteCommand(COM_PING); err != nil {
 			return err
 		}
@@ -325,45 +306,51 @@ func (c *conn) Ping() error {
 	return nil
 }
 
-func (c *conn) Exec(command string) (*OKPacket, error) {
-	if err := c.WriteCommandStr(COM_QUERY, command); err != nil {
+func (c *conn) Exec(command string, args ...interface{}) (*Result, error) {
+	if len(args) == 0 {
+		if p, err := c.exec(command); err != nil {
+			return nil, err
+		} else {
+			//todo, for strict_mode treat warning as error
+			return &Result{Status: p.Status, InsertId: p.LastInsertId,
+				AffectedRows: p.AffectedRows}, nil
+		}
+	} else {
+		if s, err := c.Prepare(command); err != nil {
+			return nil, err
+		} else {
+			var r *Result
+			r, err = s.Exec(args...)
+			s.Close()
+			return r, err
+		}
+	}
+}
+
+func (c *conn) exec(query string) (*OKPacket, error) {
+	if err := c.WriteCommandStr(COM_QUERY, query); err != nil {
 		return nil, err
 	}
 
 	return c.ReadOK()
 }
 
-func (c *conn) Begin() (*OKPacket, error) {
-	return c.Exec("begin")
+func (c *conn) Begin() error {
+	_, err := c.exec("begin")
+	return err
 }
 
-func (c *conn) Commit() (*OKPacket, error) {
-	return c.Exec("commit")
+func (c *conn) Commit() error {
+	_, err := c.exec("commit")
+	return err
 }
 
-func (c *conn) Rollback() (*OKPacket, error) {
-	return c.Exec("rollback")
+func (c *conn) Rollback() error {
+	_, err := c.exec("rollback")
+	return err
 }
 
 func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
-	cols, err := c.RawFieldList(table, fieldWildcard)
-	if err != nil {
-		return nil, err
-	}
-
-	f := make([]Field, len(cols))
-
-	for i := range cols {
-		f[i], err = cols[i].Parse()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return f, nil
-}
-
-func (c *conn) RawFieldList(table, fieldWildcard string) ([]FieldPacket, error) {
 	if err := c.WriteCommandStrStr(COM_FIELD_LIST, table, fieldWildcard); err != nil {
 		return nil, err
 	}
@@ -378,7 +365,7 @@ func (c *conn) RawFieldList(table, fieldWildcard string) ([]FieldPacket, error) 
 	if data[0] == ERR_HEADER {
 		return nil, LoadError(data)
 	} else if data[0] == EOF_HEADER && len(data) <= 5 {
-		return columns, nil
+		return []Field{}, nil
 	}
 
 	columns = append(columns, data)
@@ -391,30 +378,49 @@ func (c *conn) RawFieldList(table, fieldWildcard string) ([]FieldPacket, error) 
 
 		// EOF Packet
 		if data[0] == EOF_HEADER && len(data) <= 5 {
-			return columns, nil
+			break
 		}
 
 		columns = append(columns, data)
 	}
 
-	return nil, ErrMalformPacket
-}
+	f := make([]Field, len(columns))
 
-func (c *conn) Query(command string) (*Resultset, error) {
-	r, err := c.RawQuery(command)
-	if err != nil {
-		return nil, err
+	for i := range columns {
+		f[i], err = columns[i].Parse()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return r.Parse(false)
+	return f, nil
 }
 
-func (c *conn) RawQuery(query string) (*ResultsetPacket, error) {
+func (c *conn) Query(command string, args ...interface{}) (*Resultset, error) {
+	if len(args) == 0 {
+		return c.query(command)
+	} else {
+		if s, err := c.Prepare(command); err != nil {
+			return nil, err
+		} else {
+			var r *Resultset
+			r, err = s.Query(args...)
+			s.Close()
+			return r, err
+		}
+	}
+}
+
+func (c *conn) query(query string) (*Resultset, error) {
 	if err := c.WriteCommandStr(COM_QUERY, query); err != nil {
 		return nil, err
 	}
 
-	return c.readResultset()
+	if r, err := c.readResultset(); err != nil {
+		return nil, err
+	} else {
+		return r.Parse(false)
+	}
 }
 
 func (c *conn) readResultset() (*ResultsetPacket, error) {
@@ -468,7 +474,7 @@ func (c *conn) readResultColumns(result *ResultsetPacket) (err error) {
 		// EOF Packet
 		if data[0] == EOF_HEADER && len(data) <= 5 {
 			if i != len(result.Fields) {
-				log.Error("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
+				errLog("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
 				err = ErrMalformPacket
 			}
 
@@ -494,7 +500,8 @@ func (c *conn) readResultRows(result *ResultsetPacket) (err error) {
 		// EOF Packet
 		if data[0] == EOF_HEADER && len(data) <= 5 {
 			if c.capability&CLIENT_PROTOCOL_41 > 0 {
-				result.Warnings = binary.LittleEndian.Uint16(data[1:])
+				//result.Warnings = binary.LittleEndian.Uint16(data[1:])
+				//todo add strict_mode, warning will be treat as error
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 			}
 
