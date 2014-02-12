@@ -13,7 +13,7 @@ func newTestServer() *Server {
 	f := func() {
 		cfg := new(Config)
 
-		cfg.Addr = "127.0.0.1:3306"
+		cfg.Addr = "127.0.0.1:4000"
 		cfg.User = "qing"
 		cfg.Password = "admin"
 		cfg.MaxIdleConns = 4

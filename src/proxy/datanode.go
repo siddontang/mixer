@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"github.com/siddontang/golib/log"
 	"mysql"
 	"strings"
 	"time"
@@ -18,7 +17,7 @@ type DataNode struct {
 
 	name string
 
-	client *mysql.Client
+	db *mysql.DB
 
 	mode byte
 
@@ -31,9 +30,7 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	dn.server = server
 	dn.cfg = server.cfg
 
-	dn.client = mysql.NewClient(cfgNode.Addr, cfgNode.User, cfgNode.Password, cfgNode.DB, server.cfg.MaxIdleConns)
-
-	dn.db = cfgNode.DB
+	dn.db = mysql.NewDB(cfgNode.Addr, cfgNode.User, cfgNode.Password, cfgNode.DB, server.cfg.MaxIdleConns)
 
 	switch strings.ToLower(cfgNode.Mode) {
 	case "master":
@@ -41,7 +38,7 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	case "slave":
 		dn.mode = SLAVE_MODE
 	default:
-		log.Error("invalid node mode %s, use master instead", cfgNode.Mode)
+		errLog("invalid node mode %s, use master instead", cfgNode.Mode)
 		dn.mode = MASTER_MODE
 	}
 
@@ -50,8 +47,8 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	return dn
 }
 
-func (dn *DataNode) GetConn() (Conn, error) {
-	return dn.client.Get()
+func (dn *DataNode) DB() *mysql.DB {
+	return dn.db
 }
 
 func (dn *DataNode) run() {
@@ -69,22 +66,16 @@ func (dn *DataNode) run() {
 	for {
 		select {
 		case <-t.C:
-			if c, err := dn.GetConn(); err != nil {
-				log.Error("get conn error %s", err.Error())
+			if err := dn.db.Ping(); err != nil {
+				errLog("ping error %s", err.Error())
 				errNum++
 			} else {
-				if err := c.Ping(); err != nil {
-					log.Error("ping error %s", err.Error())
-					errNum++
-				} else {
-					errNum = 0
-					dn.alive = true
-				}
-				c.Close()
+				errNum = 0
+				dn.alive = true
 			}
 
 			if errNum > 3 {
-				log.Error("check alive 3 failed, disable alive")
+				errLog("check alive 3 failed, disable alive")
 				dn.alive = false
 			}
 		}

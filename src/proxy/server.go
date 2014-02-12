@@ -1,11 +1,11 @@
 package proxy
 
 import (
-	"github.com/siddontang/golib/log"
-	"github.com/siddontang/golib/timingwheel"
+	"fmt"
+	"log"
 	"net"
+	"os"
 	"runtime"
-	"time"
 )
 
 type Server struct {
@@ -21,8 +21,6 @@ type Server struct {
 	running bool
 
 	listener net.Listener
-
-	timer *timingwheel.TimingWheel
 }
 
 func NewServer(cfg *Config) *Server {
@@ -37,18 +35,14 @@ func NewServer(cfg *Config) *Server {
 	s.nodes = NewDataNodes(s)
 	s.schemas = NewSchemas(s, s.nodes)
 
-	s.timer = timingwheel.NewTimingWheel(time.Second, 3600)
-
 	return s
 }
 
 func (s *Server) Start() error {
-	log.Info("start listen %s", s.addr)
-
 	var err error
 	s.listener, err = net.Listen("tcp", s.addr)
 	if err != nil {
-		log.Error("listen error %s", err.Error())
+		errLog("listen error %s", err.Error())
 		return err
 	}
 
@@ -57,14 +51,13 @@ func (s *Server) Start() error {
 	for s.running {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			log.Error("accept error %s", err.Error())
+			errLog("accept error %s", err.Error())
 			continue
 		}
 
 		go s.onConn(conn)
 	}
 
-	log.Info("stop listen")
 	return nil
 }
 
@@ -83,17 +76,27 @@ func (s *Server) onConn(c net.Conn) {
 			const size = 4096
 			buf := make([]byte, size)
 			buf = buf[:runtime.Stack(buf, false)]
-			log.Error("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
+			errLog("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
 		}
 
 		conn.Close()
 	}()
 
 	if err := conn.Handshake(); err != nil {
-		log.Error("handshake error %s", err.Error())
+		errLog("handshake error %s", err.Error())
 		c.Close()
 		return
 	}
 
 	conn.Run()
+}
+
+var (
+	errLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
+)
+
+func errLog(format string, args ...interface{}) {
+	f := fmt.Sprintf("[Error] [mixer.proxy] %s", format)
+	s := fmt.Sprintf(f, args...)
+	errLogger.Output(2, s)
 }

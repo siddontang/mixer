@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/siddontang/golib/log"
 	"io"
 	"mysql"
 	"net"
@@ -34,8 +33,6 @@ type ClientConn struct {
 	salt []byte
 
 	schema *Schema
-
-	nodeConns map[*DataNode]mysql.Conn
 }
 
 var BaseConnId uint32 = 10000
@@ -54,19 +51,17 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 	conn.salt, _ = mysql.RandomBuf(20)
 
-	conn.nodeConns = make(map[*DataNode]mysql.Conn)
-
 	return conn
 }
 
 func (c *ClientConn) Handshake() error {
 	if err := c.writeInitialHandshake(); err != nil {
-		log.Error("send initial handshake error %s", err.Error())
+		errLog("send initial handshake error %s", err.Error())
 		return err
 	}
 
 	if err := c.readHandshakeResponse(); err != nil {
-		log.Error("recv handshake response error %s", err.Error())
+		errLog("recv handshake response error %s", err.Error())
 
 		c.WriteError(err)
 
@@ -74,7 +69,7 @@ func (c *ClientConn) Handshake() error {
 	}
 
 	if err := c.WriteOK(&mysql.OKPacket{0, 0, c.status, 0, ""}); err != nil {
-		log.Error("write ok fail %s", err.Error())
+		errLog("write ok fail %s", err.Error())
 		return err
 	}
 
@@ -86,22 +81,7 @@ func (c *ClientConn) Handshake() error {
 func (c *ClientConn) Close() error {
 	c.Conn.Close()
 
-	//connection closed but proxy connection may be in trans, cancel
-	for node, conn := range c.nodeConns {
-		if _, err := conn.Rollback(); err != nil {
-			log.Error("node %s rollback error %s", node.name, err.Error())
-		}
-	}
-
-	c.clearNodeConns()
 	return nil
-}
-
-func (c *ClientConn) clearNodeConns() {
-	for n, v := range c.nodeConns {
-		v.Close()
-		delete(c.nodeConns, n)
-	}
 }
 
 func (c *ClientConn) writeInitialHandshake() error {
@@ -209,13 +189,13 @@ func (c *ClientConn) Run() {
 
 		if err != nil {
 			if err != io.EOF {
-				log.Error("read packet error %s, close", err.Error())
+				errLog("read packet error %s, close", err.Error())
 			}
 			return
 		}
 
 		if err := c.dispatch(data); err != nil {
-			log.Error("dispatch error %s", err.Error())
+			errLog("dispatch error %s", err.Error())
 			c.WriteError(err)
 		}
 
