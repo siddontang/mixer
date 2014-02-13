@@ -1,258 +1,347 @@
 package proxy
 
 import (
-// "bytes"
-// "fmt"
-// "mysql"
-// "unicode"
+	"bytes"
+	"errors"
+	"fmt"
+	"lib/log"
+	. "mysql"
+	. "parser"
+	"strings"
 )
 
-func (c *conn) handleQuery(data []byte) error {
+type lex struct {
+	Query  string
+	Tokens []Token
+}
+
+func (c *conn) comQuery(data []byte) error {
+	tokens, err := Tokenizer(string(data))
+
+	if err != nil {
+		return err
+	}
+
+	if len(tokens) == 0 {
+		return errors.New("No Token")
+	}
+
+	l := &lex{string(data), tokens}
+
+	switch tokens[0].Type {
+	case TK_SQL_SELECT:
+		return c.handleSelect(l)
+	case TK_SQL_INSERT:
+		return c.handleExec(l)
+	case TK_SQL_UPDATE:
+		return c.handleExec(l)
+	case TK_SQL_DELETE:
+		return c.handleExec(l)
+	case TK_SQL_REPLACE:
+		return c.handleExec(l)
+	default:
+		return c.handleQueryLiteral(l)
+	}
+
 	return nil
 }
 
-// func (c *conn) getQueryCmd(data []byte) (string, error) {
-// 	//trim left blank
-// 	buf := bytes.TrimLeftFunc(data, unicode.IsSpace)
+func (c *conn) handleQueryLiteral(l *lex) error {
+	tokens := l.Tokens
 
-// 	pos := bytes.IndexFunc(buf, unicode.IsSpace)
-// 	if pos == -1 {
-// 		pos = len(buf)
-// 	}
+	switch strings.ToUpper(tokens[0].Value) {
+	case `BEGIN`:
+		return c.handleBegin()
+	case `COMMIT`:
+		return c.handleCommit()
+	case `ROLLBACK`:
+		return c.handleRollback()
+	default:
+		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", tokens[0].Value))
+	}
+}
 
-// 	return string(bytes.TrimRight(buf[0:pos], "; \t\n")), nil
-// }
+func (c *conn) isInTransaction() bool {
+	return c.status&SERVER_STATUS_IN_TRANS > 0
+}
 
-// func (c *conn) handleQuery(data []byte) error {
-// 	//trim left blank
-// 	cmd, err := c.getQueryCmd(data)
-// 	if err != nil {
-// 		return err
-// 	}
+func (c *conn) handleBegin() error {
+	c.status |= SERVER_STATUS_IN_TRANS
+	return c.writeOK(&Result{Status: c.status})
+}
 
-// 	log.Info("query %s", data)
+func (c *conn) handleCommit() (err error) {
+	if err := c.commit(); err != nil {
+		return err
+	} else {
+		return c.writeOK(&Result{Status: c.status})
+	}
+}
 
-// 	switch cmd {
-// 	case "select":
-// 		return c.handleSelect(data)
-// 	case "update":
-// 		return c.handleExec(data)
-// 	case "insert":
-// 		return c.handleExec(data)
-// 	case "delete":
-// 		return c.handleExec(data)
-// 	case "replace":
-// 		return c.handleExec(data)
-// 	case "begin":
-// 		return c.handleBegin()
-// 	case "commit":
-// 		return c.handleCommit()
-// 	case "rollback":
-// 		return c.handleRollback()
-// 	default:
-// 		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", data))
-// 	}
+func (c *conn) handleRollback() (err error) {
+	if err := c.rollback(); err != nil {
+		return err
+	} else {
+		return c.writeOK(&Result{Status: c.status})
+	}
+}
 
-// 	return nil
-// }
+func (c *conn) commit() (err error) {
+	c.status &= ^SERVER_STATUS_IN_TRANS
 
-// func (c *conn) isInTrans() bool {
-// 	return c.status&SERVER_STATUS_IN_TRANS > 0
-// }
+	for _, tx := range c.txs {
+		if e := tx.Commit(); e != nil {
+			err = e
+		}
+	}
 
-// func (c *conn) routeQuery(data []byte) error {
-// 	if c.schema == nil {
-// 		return NewDefaultError(ER_NO_DB_ERROR)
-// 	}
+	c.txs = map[*node]*Tx{}
 
-// 	r, err := c.schema.Route(data)
-// 	if err != nil {
-// 		log.Error("schema route error %s", err.Error())
-// 		return NewError(ER_UNKNOWN_ERROR, err.Error())
-// 	}
+	return
+}
 
-// 	var conn *Conn
-// 	var ok bool
-// 	for node, query := range r {
-// 		if conn, ok = c.nodeConns[node]; !ok {
-// 			if conn, err = node.PopConn(); err != nil {
-// 				log.Error("node %s pop conn error %s", node.name, err.Error())
-// 				return err
-// 			}
+func (c *conn) rollback() (err error) {
+	c.status &= ^SERVER_STATUS_IN_TRANS
 
-// 			if c.isInTrans() {
-// 				if _, err = conn.Begin(); err != nil {
-// 					log.Error("node %s write begin error %s", node.name, err.Error())
-// 					return err
-// 				}
-// 			}
+	for _, tx := range c.txs {
+		if e := tx.Rollback(); e != nil {
+			err = e
+		}
+	}
+	return
+}
 
-// 			c.nodeConns[node] = conn
-// 		}
+type comQueryer interface {
+	Query(query string, args ...interface{}) (*Resultset, error)
+	Exec(query string, args ...interface{}) (*Result, error)
+}
 
-// 		if err = conn.WriteCommandBuf(COM_QUERY, query); err != nil {
-// 			log.Error("node %s write command error %s", node.name, err.Error())
-// 			return err
-// 		}
-// 	}
+type routeFunc func(name string, q comQueryer, query string) interface{}
 
-// 	return nil
-// }
+func (c *conn) getQueryer(n *node) (comQueryer, error) {
+	if !c.isInTransaction() {
+		return n, nil
+	} else {
+		c.Lock()
+		tx, ok := c.txs[n]
+		c.Unlock()
 
-// func (c *conn) handleSelect(data []byte) (err error) {
-// 	if err = c.routeQuery(data); err != nil {
-// 		return
-// 	}
+		if ok {
+			return tx, nil
+		}
 
-// 	var result *ResultsetPacket = nil
+		var err error
+		if tx, err = n.Begin(); err != nil {
+			log.Error("node %s begin error %s", n.Name, err.Error())
+			return nil, err
+		}
 
-// 	for node, conn := range c.nodeConns {
-// 		if r, err1 := conn.ReadResultset(false); err1 != nil {
-// 			err = err1
-// 			log.Error("node %s read text result error %s", node.name, err.Error())
-// 		} else {
-// 			if result == nil {
-// 				result = r
-// 			} else {
-// 				//todo check columns defs same
+		c.Lock()
+		c.txs[n] = tx
+		c.Unlock()
 
-// 				result.Rows = append(result.Rows, r.Rows...)
-// 			}
-// 		}
-// 	}
+		return tx, nil
+	}
+}
 
-// 	if !c.isInTrans() {
-// 		c.clearNodeConns()
-// 	}
+func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
+	if c.curSchema == nil {
+		return nil, NewDefaultError(ER_NO_DB_ERROR)
+	}
 
-// 	if err != nil {
-// 		return
-// 	} else {
-// 		c.writeTextResult(result)
-// 	}
+	rs, err := c.curSchema.Route(l)
+	if err != nil {
+		log.Error("schema route error %s", err.Error())
+		return nil, NewError(ER_UNKNOWN_ERROR, err.Error())
+	}
 
-// 	return
-// }
+	ch := make(chan interface{}, len(rs))
 
-// func (c *conn) writeTextResult(result *ResultsetPacket) error {
-// 	count := PutLengthEncodedInt(uint64(len(result.ColumnDefs)))
+	for n, query := range rs {
+		go func(n *node, q string, f routeFunc) {
+			if queryer, err := c.getQueryer(n); err != nil {
+				ch <- err
+			} else {
+				ch <- f(n.Name, queryer, q)
+			}
+		}(n, query, f)
+	}
 
-// 	data := make([]byte, 4, 1024)
-// 	data = append(data, count...)
-// 	if err := c.WritePacket(data); err != nil {
-// 		return err
-// 	}
+	results := make([]interface{}, 0, len(rs))
+LOOP:
+	for {
+		select {
+		case r := <-ch:
+			results = append(results, r)
+			if len(results) == len(rs) {
+				break LOOP
+			}
+		}
+	}
 
-// 	for _, column := range result.ColumnDefs {
-// 		data = data[0:4]
-// 		data = append(data, column...)
-// 		if err := c.WritePacket(data); err != nil {
-// 			return err
-// 		}
-// 	}
+	return results, nil
+}
 
-// 	if err := c.WriteEOF(&EOFPacket{Status: c.status}); err != nil {
-// 		return err
-// 	}
+func routeSelect(nodeName string, q comQueryer, query string) interface{} {
+	r, err := q.Query(query)
+	if err != nil {
+		log.Error("node %s query error %s", nodeName, err.Error())
+		return err
+	} else {
+		return r
+	}
+}
 
-// 	for _, row := range result.Rows {
-// 		data = data[0:4]
-// 		data = append(data, row...)
-// 		if err := c.WritePacket(data); err != nil {
-// 			return err
-// 		}
-// 	}
+func mergeResultset(dest *Resultset, src *Resultset) error {
+	if dest.ColumnNumber() != src.ColumnNumber() {
+		return errors.New("column not match")
+	}
 
-// 	if err := c.WriteEOF(&EOFPacket{Status: c.status}); err != nil {
-// 		return err
-// 	}
+	for i := range dest.Fields {
+		//here we test name, type and flag
+		if !bytes.Equal(dest.Fields[i].Name, src.Fields[i].Name) {
+			return fmt.Errorf("field name %s != %s", dest.Fields[i].Name, src.Fields[i].Name)
+		}
 
-// 	return nil
-// }
+		if dest.Fields[i].Type != src.Fields[i].Type {
+			return fmt.Errorf("field type %d != %d", dest.Fields[i].Type, src.Fields[i].Type)
+		}
 
-// func (c *conn) handleExec(data []byte) (err error) {
-// 	if err = c.routeQuery(data); err != nil {
-// 		return
-// 	}
+		if dest.Fields[i].Flag != src.Fields[i].Flag {
+			return fmt.Errorf("field flag %d != %d", dest.Fields[i].Flag, src.Fields[i].Flag)
+		}
+	}
 
-// 	pkg := &OKPacket{Status: c.status}
+	dest.Status |= src.Status
 
-// 	for node, conn := range c.nodeConns {
-// 		if p, err1 := conn.ReadOK(); err1 != nil {
-// 			err = err1
-// 			log.Error("node %s read ok error %s", node.name, err.Error())
-// 		} else {
-// 			pkg.AffectedRows += p.AffectedRows
-// 			if pkg.LastInsertId < p.LastInsertId {
-// 				pkg.LastInsertId = p.LastInsertId
-// 			}
+	//later we may merge with select condition like limit, order by, etc...
+	//now we only append data
+	for _, v := range src.Data {
+		dest.Data = append(dest.Data, v)
+	}
 
-// 			pkg.Status |= p.Status
-// 			//now we skip warning and info
-// 			//pkg.Warnings += p.Warnings
-// 			//pkg.Info = p.Info
-// 		}
-// 	}
+	return nil
+}
 
-// 	if !c.isInTrans() {
-// 		c.clearNodeConns()
-// 	}
+func (c *conn) writeResultset(r *Resultset) error {
+	columnLen := PutLengthEncodedInt(uint64(len(r.Fields)))
 
-// 	if err != nil {
-// 		return
-// 	} else {
-// 		c.WriteOK(pkg)
-// 	}
+	data := make([]byte, 4, 1024)
 
-// 	return
-// }
+	data = append(data, columnLen...)
+	if err := c.WritePacket(data); err != nil {
+		return err
+	}
 
-// func (c *conn) handleBegin() error {
-// 	c.status |= SERVER_STATUS_IN_TRANS
+	for _, v := range r.Fields {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		if err := c.WritePacket(data); err != nil {
+			return err
+		}
+	}
 
-// 	c.WriteOK(&OKPacket{Status: c.status})
+	if err := c.writeEOF(r.Status); err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	rows, err := r.DumpRows()
+	if err != nil {
+		return err
+	}
 
-// func (c *conn) handleCommit() (err error) {
-// 	c.status &= ^SERVER_STATUS_IN_TRANS
+	for i := range rows {
+		data = data[0:4]
+		data = append(data, rows[i]...)
+		if err := c.WritePacket(data); err != nil {
+			return err
+		}
+	}
 
-// 	for n, v := range c.nodeConns {
-// 		if _, err1 := v.Commit(); err1 != nil {
-// 			err = err1
-// 			log.Error("%s commit error %s", n.name, err.Error())
-// 		}
-// 	}
+	if err := c.writeEOF(r.Status); err != nil {
+		return err
+	}
 
-// 	c.clearNodeConns()
+	return nil
+}
 
-// 	if err != nil {
-// 		return
-// 	} else {
-// 		c.WriteOK(&OKPacket{Status: c.status})
-// 	}
+func (c *conn) handleSelect(l *lex) error {
+	results, err := c.route(l, routeSelect)
+	if err != nil {
+		return err
+	}
 
-// 	return
-// }
+	var r *Resultset = nil
 
-// func (c *conn) handleRollback() (err error) {
-// 	c.status &= ^SERVER_STATUS_IN_TRANS
+LOOP:
+	for _, i := range results {
+		switch v := i.(type) {
+		case error:
+			err = v
+			break LOOP
+		case *Resultset:
+			if r == nil {
+				r = v
+			} else {
+				if e := mergeResultset(r, v); err != nil {
+					err = e
+					break LOOP
+				}
+			}
+		default:
+			err = fmt.Errorf("invalid return type %T", i)
+			break LOOP
+		}
+	}
 
-// 	for n, v := range c.nodeConns {
-// 		if _, err1 := v.Rollback(); err1 != nil {
-// 			err = err1
-// 			log.Error("%s rollback error %s", n.name, err.Error())
-// 		}
-// 	}
+	if err != nil {
+		return err
+	} else {
+		r.Status |= c.status
+		return c.writeResultset(r)
+	}
+}
 
-// 	c.clearNodeConns()
+func routeExec(nodeName string, q comQueryer, query string) interface{} {
+	r, err := q.Exec(query)
+	if err != nil {
+		log.Error("node %s exec error %s", nodeName, err.Error())
+		return err
+	} else {
+		return r
+	}
+}
 
-// 	if err != nil {
-// 		return
-// 	} else {
-// 		c.WriteOK(&OKPacket{Status: c.status})
-// 	}
+func (c *conn) handleExec(l *lex) error {
+	results, err := c.route(l, routeExec)
+	if err != nil {
+		return err
+	}
 
-// 	return
-// }
+	var r = new(Result)
+	r.Status = c.status
+
+LOOP:
+	for _, i := range results {
+		switch v := i.(type) {
+		case error:
+			err = v
+			break LOOP
+		case (*Result):
+			r.Status |= v.Status
+			r.AffectedRows += v.AffectedRows
+			if r.InsertId < v.InsertId {
+				r.InsertId = v.InsertId
+			}
+		default:
+			err = fmt.Errorf("invalid return type %T", i)
+			break LOOP
+		}
+	}
+
+	if err != nil {
+		return err
+	} else {
+		return c.writeOK(r)
+	}
+}

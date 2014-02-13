@@ -8,6 +8,7 @@ import (
 	"lib/log"
 	. "mysql"
 	"net"
+	"sync"
 	"sync/atomic"
 )
 
@@ -18,6 +19,8 @@ var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG |
 //client <-> proxy
 type conn struct {
 	PacketIO
+
+	sync.Mutex
 
 	server *Server
 
@@ -34,11 +37,13 @@ type conn struct {
 	salt []byte
 
 	curSchema *schema
+
+	txs map[*node]*Tx
 }
 
 var baseConnId uint32 = 10000
 
-func Newconn(s *Server, co net.Conn) *conn {
+func newconn(s *Server, co net.Conn) *conn {
 	c := new(conn)
 
 	c.server = s
@@ -51,6 +56,8 @@ func Newconn(s *Server, co net.Conn) *conn {
 	c.status = SERVER_STATUS_AUTOCOMMIT
 
 	c.salt, _ = RandomBuf(20)
+
+	c.txs = make(map[*node]*Tx)
 
 	return c
 }
@@ -81,6 +88,8 @@ func (c *conn) Handshake() error {
 
 func (c *conn) Close() error {
 	c.Conn.Close()
+
+	c.rollback()
 
 	return nil
 }
@@ -197,7 +206,9 @@ func (c *conn) Run() {
 
 		if err := c.dispatch(data); err != nil {
 			log.Error("dispatch error %s", err.Error())
-			c.writeError(err)
+			if err != ErrBadConn {
+				c.writeError(err)
+			}
 		}
 
 		c.Sequence = 0
@@ -207,10 +218,9 @@ func (c *conn) Run() {
 func (c *conn) dispatch(data []byte) error {
 	switch data[0] {
 	case COM_QUERY:
-		return c.handleQuery(data[1:])
+		return c.comQuery(data[1:])
 	case COM_PING:
-		c.writeOK(&Result{Status: c.status})
-		return nil
+		return c.writeOK(&Result{Status: c.status})
 	case COM_INIT_DB:
 		return c.useDB(string(data[1:]))
 	default:
@@ -265,6 +275,18 @@ func (c *conn) writeError(e error) error {
 	}
 
 	data = append(data, m.Message...)
+
+	return c.WritePacket(data)
+}
+
+func (c *conn) writeEOF(status uint16) error {
+	data := make([]byte, 4, 9)
+
+	data = append(data, EOF_HEADER)
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, 0, 0)
+		data = append(data, byte(status), byte(status)>>8)
+	}
 
 	return c.WritePacket(data)
 }

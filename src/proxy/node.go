@@ -16,19 +16,19 @@ type node struct {
 	server *Server
 	cfg    *config
 
-	name string
+	Name string
 
 	*DB
 
-	mode byte
+	Mode byte
 
-	alive bool
+	Alive bool
 }
 
 func newNode(server *Server, cfgNode *configDataNode) *node {
 	n := new(node)
 
-	n.name = cfgNode.Name
+	n.Name = cfgNode.Name
 	n.server = server
 	n.cfg = server.cfg
 
@@ -36,12 +36,12 @@ func newNode(server *Server, cfgNode *configDataNode) *node {
 
 	switch strings.ToLower(cfgNode.Mode) {
 	case "master":
-		n.mode = MASTER_MODE
+		n.Mode = MASTER_MODE
 	case "slave":
-		n.mode = SLAVE_MODE
+		n.Mode = SLAVE_MODE
 	default:
 		log.Error("invalid node mode %s, use master instead", cfgNode.Mode)
-		n.mode = MASTER_MODE
+		n.Mode = MASTER_MODE
 	}
 
 	go n.run()
@@ -50,7 +50,7 @@ func newNode(server *Server, cfgNode *configDataNode) *node {
 }
 
 func (n *node) run() {
-	n.alive = true
+	n.Alive = true
 
 	//to do
 	//1 check connection alive
@@ -69,19 +69,15 @@ func (n *node) run() {
 				errNum++
 			} else {
 				errNum = 0
-				n.alive = true
+				n.Alive = true
 			}
 
 			if errNum > 3 {
 				log.Error("check alive 3 failed, disable alive")
-				n.alive = false
+				n.Alive = false
 			}
 		}
 	}
-}
-
-func (n *node) IsAlive() bool {
-	return n.alive
 }
 
 type nodes map[string]*node

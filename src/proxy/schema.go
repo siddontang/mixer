@@ -24,15 +24,13 @@ func newSchema(server *Server, cfgSchema *configSchema, nodes []*node) *schema {
 	return s
 }
 
-//return a map key is datanode and value is the query the datanode will run
-func (s *schema) Route(query []byte) (map[*node][]byte, error) {
+//return a map key is node and value is the query the node will run
+func (s *schema) Route(l *lex) (map[*node]string, error) {
 	//todo
-	//1, parse query with rule
-	//2, rebuild query to send different datanode
-
+	//rebuild query for different node
 	//now we only return first datanode
 
-	return map[*node][]byte{s.nodes[0]: query}, nil
+	return map[*node]string{s.nodes[0]: l.Query}, nil
 }
 
 type schemas map[string]*schema

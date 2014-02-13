@@ -77,7 +77,7 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) onConn(c net.Conn) {
-	conn := Newconn(s, c)
+	conn := newconn(s, c)
 
 	defer func() {
 		if err := recover(); err != nil {
