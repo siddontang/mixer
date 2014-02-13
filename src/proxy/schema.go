@@ -4,20 +4,20 @@ import (
 	"fmt"
 )
 
-type Schema struct {
+type schema struct {
 	server   *Server
-	cfg      *Config
-	name     string
-	nodes    []*DataNode
+	cfg      *config
+	db       string
+	nodes    []*node
 	rw_split bool
 }
 
-func NewSchema(server *Server, cfgSchema *ConfigSchema, nodes []*DataNode) *Schema {
-	s := new(Schema)
+func newSchema(server *Server, cfgSchema *configSchema, nodes []*node) *schema {
+	s := new(schema)
 
 	s.server = server
 	s.cfg = server.cfg
-	s.name = cfgSchema.Name
+	s.db = cfgSchema.DB
 	s.nodes = nodes
 	s.rw_split = cfgSchema.RWSplit
 
@@ -25,46 +25,46 @@ func NewSchema(server *Server, cfgSchema *ConfigSchema, nodes []*DataNode) *Sche
 }
 
 //return a map key is datanode and value is the query the datanode will run
-func (s *Schema) Route(query []byte) (map[*DataNode][]byte, error) {
+func (s *schema) Route(query []byte) (map[*node][]byte, error) {
 	//todo
 	//1, parse query with rule
 	//2, rebuild query to send different datanode
 
 	//now we only return first datanode
 
-	return map[*DataNode][]byte{s.nodes[0]: query}, nil
+	return map[*node][]byte{s.nodes[0]: query}, nil
 }
 
-type Schemas map[string]*Schema
+type schemas map[string]*schema
 
-func (ss Schemas) GetSchema(name string) *Schema {
-	if s, ok := ss[name]; ok {
+func (ss schemas) GetSchema(db string) *schema {
+	if s, ok := ss[db]; ok {
 		return s
 	} else {
 		return nil
 	}
 }
 
-func NewSchemas(server *Server, nodes DataNodes) Schemas {
+func newSchemas(server *Server, nodes nodes) schemas {
 	cfg := server.cfg
 
-	s := make(Schemas, len(cfg.Schemas))
+	s := make(schemas, len(cfg.Schemas))
 
 	for _, v := range cfg.Schemas {
 		if len(v.Nodes) == 0 {
-			panic(fmt.Sprintf("schema %s has no node", v.Name))
+			panic(fmt.Sprintf("schema %s has no node", v.DB))
 		}
 
-		nds := make([]*DataNode, 0, len(v.Nodes))
+		nds := make([]*node, 0, len(v.Nodes))
 		for _, nodeName := range v.Nodes {
 			if node := nodes.GetNode(nodeName); node == nil {
-				panic(fmt.Sprintf("schema %s has invalid node name %s", v.Name, nodeName))
+				panic(fmt.Sprintf("schema %s has invalid node name %s", v.DB, nodeName))
 			} else {
 				nds = append(nds, node)
 			}
 		}
 
-		s[v.Name] = NewSchema(server, &v, nds)
+		s[v.DB] = newSchema(server, &v, nds)
 	}
 
 	return s

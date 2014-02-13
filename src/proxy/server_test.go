@@ -11,23 +11,22 @@ var testServer *Server
 
 func newTestServer() *Server {
 	f := func() {
-		cfg := new(Config)
+		cfg := new(config)
 
 		cfg.Addr = "127.0.0.1:4000"
-		cfg.User = "qing"
-		cfg.Password = "admin"
-		cfg.MaxIdleConns = 4
+		cfg.User = "root"
+		cfg.Password = ""
 
-		cfg.DataNodes = []ConfigDataNode{
-			ConfigDataNode{"node1", "10.20.135.213:3306", "qing", "admin", "mixer", "master"},
-			ConfigDataNode{"node2", "10.20.135.213:3306", "qing", "admin", "mixer", "slave"},
+		cfg.Nodes = []configDataNode{
+			configDataNode{"node1", "127.0.0.1:3306", "root", "", "mixer", "master", 4},
+			configDataNode{"node2", "127.0.0.1:3306", "root", "", "mixer", "slave", 4},
 		}
 
-		cfg.Schemas = []ConfigSchema{
-			ConfigSchema{"mixer", []string{"node1", "node2"}, true},
+		cfg.Schemas = []configSchema{
+			configSchema{"mixer", []string{"node1", "node2"}, true},
 		}
 
-		testServer = NewServer(cfg)
+		testServer = newServer(cfg)
 
 		go testServer.Start()
 

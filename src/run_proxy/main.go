@@ -9,11 +9,7 @@ var configDir = flag.String("configDir", "../etc/proxy", "config directory")
 
 func main() {
 	flag.Parse()
-	cfg, err := proxy.NewConfig(*configDir)
-	if err != nil {
-		panic(err)
-	}
 
-	s := proxy.NewServer(cfg)
+	s := proxy.NewServer(*configDir)
 	s.Start()
 }

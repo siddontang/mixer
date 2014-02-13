@@ -1,49 +1,48 @@
 package proxy
 
 import (
+	"encoding/json"
 	"io/ioutil"
-	"launchpad.net/goyaml"
 	"path"
 )
 
-type ConfigDataNode struct {
-	Name     string `yaml:"name"`
-	Addr     string `yaml:"addr"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	DB       string `yaml:"db"`
-	Mode     string `yaml:"mode"`
+type configDataNode struct {
+	Name         string `json:"name"`
+	Addr         string `json:"addr"`
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	DB           string `json:"db"`
+	Mode         string `json:"mode"`
+	MaxIdleConns int    `json:"max_idle_conns"`
 }
 
-type ConfigSchema struct {
-	Name    string   `yaml:"name"`
-	Nodes   []string `yaml:"nodes"`
-	RWSplit bool     `yaml:"rw_split"`
+type configSchema struct {
+	DB      string   `json:"db"`
+	Nodes   []string `json:"nodes"`
+	RWSplit bool     `json:"rw_split"`
 }
 
-type ConfigServer struct {
-	Addr     string `yaml:"addr"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
+type configServer struct {
+	Addr     string `json:"addr"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 
-	MaxIdleConns int `yaml:"max_idle_conns"`
+	Nodes []configDataNode `json:"nodes"`
 
-	DataNodes []ConfigDataNode `yaml:"datanodes"`
-
-	Schemas []ConfigSchema `yaml:"schemas"`
+	Schemas []configSchema `json:"schemas"`
 }
 
-type Config struct {
-	ConfigServer
+type config struct {
+	configServer
 }
 
-func (c *Config) loadServer(configFile string) error {
+func (c *config) loadServer(configFile string) error {
 	b, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return err
 	}
 
-	err = goyaml.Unmarshal(b, &c.ConfigServer)
+	err = json.Unmarshal(b, &c.configServer)
 	if err != nil {
 		return err
 	}
@@ -51,18 +50,18 @@ func (c *Config) loadServer(configFile string) error {
 	return nil
 }
 
-func (c *Config) loadRule(configFile string) error {
+func (c *config) loadRule(configFile string) error {
 	return nil
 }
 
-func NewConfig(configDir string) (*Config, error) {
-	c := new(Config)
+func newConfig(configDir string) (*config, error) {
+	c := new(config)
 
-	if err := c.loadServer(path.Join(configDir, "server.yaml")); err != nil {
+	if err := c.loadServer(path.Join(configDir, "server.json")); err != nil {
 		return nil, err
 	}
 
-	if err := c.loadRule(path.Join(configDir, "rule.yaml")); err != nil {
+	if err := c.loadRule(path.Join(configDir, "rule.json")); err != nil {
 		return nil, err
 	}
 

@@ -358,7 +358,7 @@ func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
 	columns := make([]fieldPacket, 0)
 
 	if data[0] == ERR_HEADER {
-		return nil, LoadError(data)
+		return nil, c.handleErrorPacket(data)
 	} else if data[0] == EOF_HEADER && len(data) <= 5 {
 		return []Field{}, nil
 	}

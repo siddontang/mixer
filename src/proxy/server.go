@@ -7,33 +7,43 @@ import (
 )
 
 type Server struct {
-	cfg *Config
+	cfg *config
 
 	addr     string
 	user     string
 	password string
 
-	nodes   DataNodes
-	schemas Schemas
+	nodes   nodes
+	schemas schemas
 
 	running bool
 
 	listener net.Listener
 }
 
-func NewServer(cfg *Config) *Server {
+func newServer(cfg *config) *Server {
 	s := new(Server)
 
 	s.cfg = cfg
 
-	s.addr = cfg.ConfigServer.Addr
-	s.user = cfg.ConfigServer.User
-	s.password = cfg.ConfigServer.Password
+	s.addr = cfg.configServer.Addr
+	s.user = cfg.configServer.User
+	s.password = cfg.configServer.Password
 
-	s.nodes = NewDataNodes(s)
-	s.schemas = NewSchemas(s, s.nodes)
+	s.nodes = newNodes(s)
+	s.schemas = newSchemas(s, s.nodes)
 
 	return s
+}
+
+func NewServer(cfgDir string) *Server {
+	cfg, err := newConfig(cfgDir)
+	if err != nil {
+		panic(err)
+		return nil
+	}
+
+	return newServer(cfg)
 }
 
 func (s *Server) Start() error {
@@ -67,7 +77,7 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) onConn(c net.Conn) {
-	conn := NewClientConn(s, c)
+	conn := Newconn(s, c)
 
 	defer func() {
 		if err := recover(); err != nil {

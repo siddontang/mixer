@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"io"
 	"lib/log"
-	"mysql"
+	. "mysql"
 	"net"
 	"sync/atomic"
 )
 
-var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
-	mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
-	mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTION
+var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG |
+	CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
+	CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
 
 //client <-> proxy
-type ClientConn struct {
-	mysql.PacketIO
+type conn struct {
+	PacketIO
 
 	server *Server
 
@@ -33,29 +33,29 @@ type ClientConn struct {
 
 	salt []byte
 
-	schema *Schema
+	curSchema *schema
 }
 
-var BaseConnId uint32 = 10000
+var baseConnId uint32 = 10000
 
-func NewClientConn(s *Server, c net.Conn) *ClientConn {
-	conn := new(ClientConn)
+func Newconn(s *Server, co net.Conn) *conn {
+	c := new(conn)
 
-	conn.server = s
+	c.server = s
 
-	conn.Conn = c
-	conn.Sequence = 0
+	c.Conn = co
+	c.Sequence = 0
 
-	conn.connectionId = atomic.AddUint32(&BaseConnId, 1)
+	c.connectionId = atomic.AddUint32(&baseConnId, 1)
 
-	conn.status = mysql.SERVER_STATUS_AUTOCOMMIT
+	c.status = SERVER_STATUS_AUTOCOMMIT
 
-	conn.salt, _ = mysql.RandomBuf(20)
+	c.salt, _ = RandomBuf(20)
 
-	return conn
+	return c
 }
 
-func (c *ClientConn) Handshake() error {
+func (c *conn) Handshake() error {
 	if err := c.writeInitialHandshake(); err != nil {
 		log.Error("send initial handshake error %s", err.Error())
 		return err
@@ -64,12 +64,12 @@ func (c *ClientConn) Handshake() error {
 	if err := c.readHandshakeResponse(); err != nil {
 		log.Error("recv handshake response error %s", err.Error())
 
-		c.WriteError(err)
+		c.writeError(err)
 
 		return err
 	}
 
-	if err := c.WriteOK(&mysql.OKPacket{0, 0, c.status, 0, ""}); err != nil {
+	if err := c.writeOK(&Result{Status: c.status}); err != nil {
 		log.Error("write ok fail %s", err.Error())
 		return err
 	}
@@ -79,20 +79,20 @@ func (c *ClientConn) Handshake() error {
 	return nil
 }
 
-func (c *ClientConn) Close() error {
+func (c *conn) Close() error {
 	c.Conn.Close()
 
 	return nil
 }
 
-func (c *ClientConn) writeInitialHandshake() error {
+func (c *conn) writeInitialHandshake() error {
 	data := make([]byte, 4, 128)
 
 	//min version 10
 	data = append(data, 10)
 
 	//server version[00]
-	data = append(data, mysql.ServerVersion...)
+	data = append(data, ServerVersion...)
 	data = append(data, 0)
 
 	//connection id
@@ -108,7 +108,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	data = append(data, mysql.DEFAULT_UTF8_CHARSET)
+	data = append(data, DEFAULT_UTF8_CHARSET)
 
 	//status
 	data = append(data, byte(c.status), byte(c.status>>8))
@@ -132,7 +132,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	return c.WritePacket(data)
 }
 
-func (c *ClientConn) readHandshakeResponse() error {
+func (c *conn) readHandshakeResponse() error {
 	data, err := c.ReadPacket()
 
 	if err != nil {
@@ -164,15 +164,15 @@ func (c *ClientConn) readHandshakeResponse() error {
 	pos++
 	auth := data[pos : pos+authLen]
 
-	checkAuth := mysql.CalcPassword(c.salt, []byte(c.server.cfg.Password))
+	checkAuth := CalcPassword(c.salt, []byte(c.server.cfg.Password))
 
 	if !bytes.Equal(auth, checkAuth) {
-		return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
+		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
 	}
 
 	pos += authLen
 
-	if c.capability|mysql.CLIENT_CONNECT_WITH_DB > 0 {
+	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
 		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 
@@ -184,7 +184,7 @@ func (c *ClientConn) readHandshakeResponse() error {
 	return nil
 }
 
-func (c *ClientConn) Run() {
+func (c *conn) Run() {
 	for {
 		data, err := c.ReadPacket()
 
@@ -197,36 +197,74 @@ func (c *ClientConn) Run() {
 
 		if err := c.dispatch(data); err != nil {
 			log.Error("dispatch error %s", err.Error())
-			c.WriteError(err)
+			c.writeError(err)
 		}
 
 		c.Sequence = 0
 	}
 }
 
-func (c *ClientConn) dispatch(data []byte) error {
+func (c *conn) dispatch(data []byte) error {
 	switch data[0] {
-	case mysql.COM_QUERY:
+	case COM_QUERY:
 		return c.handleQuery(data[1:])
-	case mysql.COM_PING:
-		c.WriteOK(&mysql.OKPacket{Status: c.status})
+	case COM_PING:
+		c.writeOK(&Result{Status: c.status})
 		return nil
-	case mysql.COM_INIT_DB:
+	case COM_INIT_DB:
 		return c.useDB(string(data[1:]))
 	default:
 		msg := fmt.Sprintf("command %d not supported now", data[0])
-		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, msg)
+		return NewError(ER_UNKNOWN_ERROR, msg)
 	}
 
 	return nil
 }
 
-func (c *ClientConn) useDB(db string) error {
+func (c *conn) useDB(db string) error {
 	if s := c.server.schemas.GetSchema(db); s == nil {
-		return mysql.NewDefaultError(mysql.ER_BAD_DB_ERROR, db)
+		return NewDefaultError(ER_BAD_DB_ERROR, db)
 	} else {
-		c.schema = s
+		c.curSchema = s
 		c.db = db
 	}
 	return nil
+}
+
+func (c *conn) writeOK(r *Result) error {
+	data := make([]byte, 4, 32)
+
+	data = append(data, OK_HEADER)
+
+	data = append(data, PutLengthEncodedInt(r.AffectedRows)...)
+	data = append(data, PutLengthEncodedInt(r.InsertId)...)
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, byte(r.Status), byte(r.Status)>>8)
+		data = append(data, 0, 0)
+	}
+
+	return c.WritePacket(data)
+}
+
+func (c *conn) writeError(e error) error {
+	var m *MySQLError
+	var ok bool
+	if m, ok = e.(*MySQLError); !ok {
+		m = NewError(ER_UNKNOWN_ERROR, e.Error())
+	}
+
+	data := make([]byte, 4, 16+len(m.Message))
+
+	data = append(data, ERR_HEADER)
+	data = append(data, byte(m.Code), byte(m.Code>>8))
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, '#')
+		data = append(data, m.State...)
+	}
+
+	data = append(data, m.Message...)
+
+	return c.WritePacket(data)
 }
