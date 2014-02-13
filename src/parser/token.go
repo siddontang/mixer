@@ -4,23 +4,15 @@ type TokenType uint16
 
 const (
 	TK_UNKNOWN TokenType = iota
-	TK_LE
-	TK_GE
-	TK_LT
-	TK_GT
-	TK_EQ
-	TK_NE
-
-	TK_LTEQGT
-	TK_STRING
-	TK_COMMENT
-	TK_COMMENT_MYSQL
-	TK_LITERAL
-	TK_VARIABLE
-	TK_SYS_VARIABLE
-	TK_FUNCTION
-	TK_INTEGER
-	TK_FLOAT
+	TK_LE                //<=
+	TK_GE                //>=
+	TK_LT                //<
+	TK_GT                //>
+	TK_EQ                //=
+	TK_NE                //!=,<>
+	TK_LTEQGT            //<=>
+	TK_LTLT              //<<
+	TK_GTGT              //>>
 
 	TK_DOT
 	TK_COMMA
@@ -31,8 +23,8 @@ const (
 	TK_MINUS
 	TK_DIV
 	TK_MOD
-	TK_LTLT //<<
-	TK_GTGT //>>
+	TK_BACKSLASH     //\
+	TK_QUESTION_MARK //?
 
 	TK_LPAREN   //(
 	TK_RPAREN   //)
@@ -40,8 +32,6 @@ const (
 	TK_RBRACKET //]
 	TK_LBRACE   //{
 	TK_RBRACE   //}
-
-	TK_BACKSLASH //\
 
 	TK_BITWISE_AND
 	TK_BITWISE_OR
@@ -51,6 +41,16 @@ const (
 	TK_LOGICAL_AND
 	TK_LOGICAL_OR
 	TK_LOGICAL_NOT
+
+	TK_STRING
+	TK_COMMENT
+	TK_COMMENT_MYSQL
+	TK_LITERAL
+	TK_VARIABLE
+	TK_SYS_VARIABLE
+	TK_FUNCTION
+	TK_INTEGER
+	TK_FLOAT
 
 	TK_SQL_ACCESSIBLE
 	TK_SQL_ACTION

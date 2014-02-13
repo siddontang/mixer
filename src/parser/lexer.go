@@ -149,6 +149,7 @@ var stateMap = map[rune]stateFn{
 	'{':  lexLBrace,
 	'}':  lexRBrace,
 	'\\': lexBackslash,
+	'?':  lexQuestionMark,
 	'0':  lexNumber0,
 	'1':  lexNumber,
 	'2':  lexNumber,
@@ -563,6 +564,10 @@ func lexBackslash(l *Lexer) stateFn {
 		l.backup()
 		return l.emit(TK_BACKSLASH)
 	}
+}
+
+func lexQuestionMark(l *Lexer) stateFn {
+	return l.emit(TK_QUESTION_MARK)
 }
 
 func isIdentifier(r rune) bool {
