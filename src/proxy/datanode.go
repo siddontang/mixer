@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"lib/log"
 	"mysql"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func NewDataNode(server *Server, cfgNode *ConfigDataNode) *DataNode {
 	case "slave":
 		dn.mode = SLAVE_MODE
 	default:
-		errLog("invalid node mode %s, use master instead", cfgNode.Mode)
+		log.Error("invalid node mode %s, use master instead", cfgNode.Mode)
 		dn.mode = MASTER_MODE
 	}
 
@@ -67,7 +68,7 @@ func (dn *DataNode) run() {
 		select {
 		case <-t.C:
 			if err := dn.db.Ping(); err != nil {
-				errLog("ping error %s", err.Error())
+				log.Error("ping error %s", err.Error())
 				errNum++
 			} else {
 				errNum = 0
@@ -75,7 +76,7 @@ func (dn *DataNode) run() {
 			}
 
 			if errNum > 3 {
-				errLog("check alive 3 failed, disable alive")
+				log.Error("check alive 3 failed, disable alive")
 				dn.alive = false
 			}
 		}

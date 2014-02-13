@@ -1,10 +1,8 @@
 package proxy
 
 import (
-	"fmt"
-	"log"
+	"lib/log"
 	"net"
-	"os"
 	"runtime"
 )
 
@@ -42,7 +40,7 @@ func (s *Server) Start() error {
 	var err error
 	s.listener, err = net.Listen("tcp", s.addr)
 	if err != nil {
-		errLog("listen error %s", err.Error())
+		log.Error("listen error %s", err.Error())
 		return err
 	}
 
@@ -51,7 +49,7 @@ func (s *Server) Start() error {
 	for s.running {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			errLog("accept error %s", err.Error())
+			log.Error("accept error %s", err.Error())
 			continue
 		}
 
@@ -76,27 +74,17 @@ func (s *Server) onConn(c net.Conn) {
 			const size = 4096
 			buf := make([]byte, size)
 			buf = buf[:runtime.Stack(buf, false)]
-			errLog("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
+			log.Error("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
 		}
 
 		conn.Close()
 	}()
 
 	if err := conn.Handshake(); err != nil {
-		errLog("handshake error %s", err.Error())
+		log.Error("handshake error %s", err.Error())
 		c.Close()
 		return
 	}
 
 	conn.Run()
-}
-
-var (
-	errLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
-)
-
-func errLog(format string, args ...interface{}) {
-	f := fmt.Sprintf("[Error] [mixer.proxy] %s", format)
-	s := fmt.Sprintf(f, args...)
-	errLogger.Output(2, s)
 }

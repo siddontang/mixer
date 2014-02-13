@@ -3,8 +3,6 @@ package mysql
 import (
 	"errors"
 	"fmt"
-	"log"
-	"os"
 )
 
 var (
@@ -57,14 +55,4 @@ func NewError(errCode uint16, message string) *MySQLError {
 	e.Message = message
 
 	return e
-}
-
-var (
-	errLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)
-)
-
-func errLog(format string, args ...interface{}) {
-	f := fmt.Sprintf("[Error] [mixer.mysql] %s", format)
-	s := fmt.Sprintf(f, args...)
-	errLogger.Output(2, s)
 }

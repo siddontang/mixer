@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"lib/log"
 	"net"
 	"time"
 )
@@ -50,7 +51,7 @@ func (c *conn) ReConnect() error {
 
 	netConn, err := net.Dial("tcp", c.addr)
 	if err != nil {
-		errLog("connect %s error %s", c.addr, err.Error())
+		log.Error("connect %s error %s", c.addr, err.Error())
 		return err
 	}
 
@@ -58,20 +59,20 @@ func (c *conn) ReConnect() error {
 	c.Sequence = 0
 
 	if err := c.readInitialHandshake(); err != nil {
-		errLog("read initial handshake error %s", err.Error())
+		log.Error("read initial handshake error %s", err.Error())
 		c.Conn.Close()
 		return err
 	}
 
 	if err := c.writeAuthHandshake(); err != nil {
-		errLog("write auth handshake error %s", err.Error())
+		log.Error("write auth handshake error %s", err.Error())
 		c.Conn.Close()
 
 		return err
 	}
 
 	if _, err := c.readOK(); err != nil {
-		errLog("read ok error %s", err.Error())
+		log.Error("read ok error %s", err.Error())
 		c.Conn.Close()
 
 		return err
@@ -102,7 +103,7 @@ func (c *conn) readInitialHandshake() error {
 
 	if data[0] < MinProtocolVersion {
 		err := fmt.Errorf("invalid protocol version %d, must >= 10", data[0])
-		errLog(err.Error())
+		log.Error(err.Error())
 		return err
 	}
 
@@ -468,7 +469,7 @@ func (c *conn) readResultColumns(result *resultsetPacket) (err error) {
 		// EOF Packet
 		if c.isEOFPacket(data) {
 			if i != len(result.Fields) {
-				errLog("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
+				log.Error("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
 				err = ErrMalformPacket
 			}
 

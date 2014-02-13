@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"container/list"
+	"lib/log"
 	"sync"
 )
 
@@ -54,13 +55,13 @@ func (db *DB) newConn() (*dbConn, error) {
 	co := new(conn)
 
 	if err := co.Connect(db.addr, db.user, db.password, db.db); err != nil {
-		errLog("connect %s error %s", db.addr, err.Error())
+		log.Error("connect %s error %s", db.addr, err.Error())
 		return nil, err
 	}
 
 	//we must always use autocommit
 	if _, err := co.Exec("set autocommit = 1"); err != nil {
-		errLog("set autocommit error %s", err.Error())
+		log.Error("set autocommit error %s", err.Error())
 		co.Close()
 
 		return nil, err

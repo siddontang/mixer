@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"lib/log"
 	"mysql"
 	"net"
 	"sync/atomic"
@@ -56,12 +57,12 @@ func NewClientConn(s *Server, c net.Conn) *ClientConn {
 
 func (c *ClientConn) Handshake() error {
 	if err := c.writeInitialHandshake(); err != nil {
-		errLog("send initial handshake error %s", err.Error())
+		log.Error("send initial handshake error %s", err.Error())
 		return err
 	}
 
 	if err := c.readHandshakeResponse(); err != nil {
-		errLog("recv handshake response error %s", err.Error())
+		log.Error("recv handshake response error %s", err.Error())
 
 		c.WriteError(err)
 
@@ -69,7 +70,7 @@ func (c *ClientConn) Handshake() error {
 	}
 
 	if err := c.WriteOK(&mysql.OKPacket{0, 0, c.status, 0, ""}); err != nil {
-		errLog("write ok fail %s", err.Error())
+		log.Error("write ok fail %s", err.Error())
 		return err
 	}
 
@@ -189,13 +190,13 @@ func (c *ClientConn) Run() {
 
 		if err != nil {
 			if err != io.EOF {
-				errLog("read packet error %s, close", err.Error())
+				log.Error("read packet error %s, close", err.Error())
 			}
 			return
 		}
 
 		if err := c.dispatch(data); err != nil {
-			errLog("dispatch error %s", err.Error())
+			log.Error("dispatch error %s", err.Error())
 			c.WriteError(err)
 		}
 
