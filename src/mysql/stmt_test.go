@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -68,7 +69,7 @@ func TestStmt_Delete(t *testing.T) {
 }
 
 func TestStmt_Insert(t *testing.T) {
-	str := `insert into mixer_test_stmt (id, str, f, e) values (?, ?, ?, ?)`
+	str := `insert into mixer_test_stmt (id, str, f, e, u, i) values (?, ?, ?, ?, ?, ?)`
 
 	c := newTestConn()
 	defer c.Close()
@@ -79,7 +80,7 @@ func TestStmt_Insert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pkg, err := s.Exec(1, "a", 3.14, "test1"); err != nil {
+	if pkg, err := s.Exec(1, "a", 3.14, "test1", 255, -127); err != nil {
 		t.Fatal(err)
 	} else {
 		if pkg.AffectedRows != 1 {
@@ -139,6 +140,46 @@ func TestStmt_Select(t *testing.T) {
 	}
 
 	s.Close()
+}
+
+func TestStmt_ResultsetDump(t *testing.T) {
+	str := `select * from mixer_test_stmt where id = ?`
+
+	c := newTestConn()
+	defer c.Close()
+
+	s, err := c.Prepare(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result, err := s.Query(1); err != nil {
+		t.Fatal(err)
+	} else {
+		p := new(resultsetPacket)
+		p.Status = result.Status
+
+		for i := range result.Fields {
+			p.Fields = append(p.Fields, fieldPacket(result.Fields[i].Dump()))
+		}
+
+		if rows, err := result.DumpRows(); err != nil {
+			t.Fatal(err)
+		} else {
+			for i := range rows {
+				p.Rows = append(p.Rows, rowPacket(rows[i]))
+			}
+		}
+
+		if r, err := p.Parse(true); err != nil {
+			t.Fatal(err)
+		} else {
+			if !reflect.DeepEqual(r, result) {
+				t.Fatal("result set not equal")
+			}
+		}
+
+	}
 }
 
 func TestStmt_NULL(t *testing.T) {

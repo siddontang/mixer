@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -44,6 +45,8 @@ func TestConn_CreateTable(t *testing.T) {
           str VARCHAR(256),
           f DOUBLE,
           e enum("test1", "test2"),
+          u tinyint unsigned,
+          i tinyint,
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
@@ -114,6 +117,40 @@ func TestConn_Select(t *testing.T) {
 	}
 }
 
+func TestConn_ResultsetDump(t *testing.T) {
+	s := `select * from mixer_test_conn where id = 1`
+
+	c := newTestConn()
+	defer c.Close()
+
+	if result, err := c.Query(s); err != nil {
+		t.Fatal(err)
+	} else {
+		p := new(resultsetPacket)
+		p.Status = result.Status
+
+		for i := range result.Fields {
+			p.Fields = append(p.Fields, fieldPacket(result.Fields[i].Dump()))
+		}
+
+		if rows, err := result.DumpRows(); err != nil {
+			t.Fatal(err)
+		} else {
+			for i := range rows {
+				p.Rows = append(p.Rows, rowPacket(rows[i]))
+			}
+		}
+
+		if r, err := p.Parse(false); err != nil {
+			t.Fatal(err)
+		} else {
+			if !reflect.DeepEqual(r, result) {
+				t.Fatal("result set not equal")
+			}
+		}
+	}
+}
+
 func TestConn_FieldList(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
@@ -127,6 +164,15 @@ func TestConn_FieldList(t *testing.T) {
 
 		if string(result[0].Name) != `str` {
 			t.Fatal(string(result[0].Name))
+		}
+
+		pkg := fieldPacket(result[0].Dump())
+		if f, err := pkg.Parse(); err != nil {
+			t.Fatal(err)
+		} else {
+			if !reflect.DeepEqual(f, result[0]) {
+				t.Fatal("field dump error")
+			}
 		}
 	}
 }

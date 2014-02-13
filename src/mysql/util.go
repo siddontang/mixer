@@ -133,6 +133,13 @@ func SkipLengthEnodedString(b []byte) (int, error) {
 	return n, io.EOF
 }
 
+func PutLengthEncodedString(b []byte) []byte {
+	data := make([]byte, 0, len(b)+9)
+	data = append(data, PutLengthEncodedInt(uint64(len(b)))...)
+	data = append(data, b...)
+	return data
+}
+
 func Uint16ToBytes(n uint16) []byte {
 	return []byte{
 		byte(n),
