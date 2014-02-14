@@ -19,8 +19,7 @@ func (c *conn) handleSetVariable(l *lex) error {
 
 func (c *conn) handleSetAutoCommit(l *lex) error {
 	if l.Get(2).Type == TK_EQ &&
-		l.Get(3).Type == TK_INTEGER &&
-		(l.Get(4).Type == TK_EOF || l.Get(4).Type == TK_SEMICOLON) {
+		l.Get(3).Type == TK_INTEGER {
 		if i, err := strconv.Atoi(l.Get(3).Value); err != nil {
 			return err
 		} else {
