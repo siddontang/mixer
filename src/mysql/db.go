@@ -77,6 +77,23 @@ func (db *DB) newConn() (*dbConn, error) {
 	return dc, nil
 }
 
+func (db *DB) tryReuse(co *dbConn) error {
+	if co.isInTransaction() {
+		//we can not reuse a connection in transaction status
+		log.Error("reuse connection can not in transaction status, rollback")
+		if err := co.Rollback(); err != nil {
+			return err
+		}
+	} else if !co.isAutoCommit() {
+		//we can not  reuse a connection not in autocomit
+		log.Error("reuse connection must have autocommit status, enable autocommit")
+		if _, err := co.Exec("set autocommit = 1"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (db *DB) popConn() (co *dbConn, err error) {
 	db.Lock()
 	if db.conns.Len() > 0 {
@@ -89,10 +106,7 @@ func (db *DB) popConn() (co *dbConn, err error) {
 	if co != nil {
 		co.Lock()
 		if err := co.Ping(); err == nil {
-			if co.isInTransaction() {
-				//we can not reuse a connection in transaction status
-				log.Error("reuse connection can not in transaction status")
-			} else {
+			if err := db.tryReuse(co); err == nil {
 				co.Unlock()
 				//connection may alive
 				return co, nil
