@@ -80,13 +80,13 @@ func (db *DB) newConn() (*dbConn, error) {
 func (db *DB) tryReuse(co *dbConn) error {
 	if co.isInTransaction() {
 		//we can not reuse a connection in transaction status
-		log.Error("reuse connection can not in transaction status, rollback")
+		log.Warn("reuse connection can not in transaction status, rollback")
 		if err := co.Rollback(); err != nil {
 			return err
 		}
 	} else if !co.isAutoCommit() {
 		//we can not  reuse a connection not in autocomit
-		log.Error("reuse connection must have autocommit status, enable autocommit")
+		log.Warn("reuse connection must have autocommit status, enable autocommit")
 		if _, err := co.Exec("set autocommit = 1"); err != nil {
 			return err
 		}
