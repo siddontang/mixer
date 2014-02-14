@@ -79,6 +79,16 @@ func (c *conn) ReConnect() error {
 		return err
 	}
 
+	//we must always use autocommit
+	if !c.isAutoCommit() {
+		if _, err := c.Exec("set autocommit = 1"); err != nil {
+			log.Error("set autocommit error %s", err.Error())
+			c.Conn.Close()
+
+			return err
+		}
+	}
+
 	c.lastPing = time.Now().Unix()
 
 	return nil

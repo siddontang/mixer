@@ -467,6 +467,12 @@ func (r *Resultset) GetUint(row, column int) (uint64, error) {
 		return v, nil
 	case int64:
 		return uint64(v), nil
+	case float64:
+		return uint64(v), nil
+	case string:
+		return strconv.ParseUint(v, 10, 64)
+	case []byte:
+		return strconv.ParseUint(string(v), 10, 64)
 	case nil:
 		return 0, nil
 	default:
@@ -509,6 +515,14 @@ func (r *Resultset) GetFloat(row, column int) (float64, error) {
 	switch v := d.(type) {
 	case float64:
 		return v, nil
+	case uint64:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case string:
+		return strconv.ParseFloat(v, 64)
+	case []byte:
+		return strconv.ParseFloat(string(v), 64)
 	case nil:
 		return 0, nil
 	default:

@@ -59,16 +59,6 @@ func (db *DB) newConn() (*dbConn, error) {
 		return nil, err
 	}
 
-	//we must always use autocommit
-	if !co.isAutoCommit() {
-		if _, err := co.Exec("set autocommit = 1"); err != nil {
-			log.Error("set autocommit error %s", err.Error())
-			co.Close()
-
-			return nil, err
-		}
-	}
-
 	dc := new(dbConn)
 	dc.conn = co
 
