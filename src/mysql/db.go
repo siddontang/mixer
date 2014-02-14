@@ -61,6 +61,7 @@ func (db *DB) newConn() (*dbConn, error) {
 
 	dc := new(dbConn)
 	dc.conn = co
+	dc.closed = false
 
 	dc.stmts = make(map[*stmt]bool)
 
