@@ -15,6 +15,14 @@ type lex struct {
 	Tokens []Token
 }
 
+func (l *lex) Get(index int) Token {
+	if index >= 0 && index < len(l.Tokens) {
+		return l.Tokens[index]
+	} else {
+		return Token{TK_UNKNOWN, ""}
+	}
+}
+
 func (c *conn) comQuery(data []byte) error {
 	tokens, err := Tokenizer(string(data))
 
@@ -39,6 +47,8 @@ func (c *conn) comQuery(data []byte) error {
 		return c.handleExec(l)
 	case TK_SQL_REPLACE:
 		return c.handleExec(l)
+	case TK_SQL_SET:
+		return c.handleSetVariable(l)
 	default:
 		return c.handleQueryLiteral(l)
 	}
@@ -47,9 +57,7 @@ func (c *conn) comQuery(data []byte) error {
 }
 
 func (c *conn) handleQueryLiteral(l *lex) error {
-	tokens := l.Tokens
-
-	switch strings.ToUpper(tokens[0].Value) {
+	switch strings.ToUpper(l.Get(0).Value) {
 	case `BEGIN`:
 		return c.handleBegin()
 	case `COMMIT`:
@@ -57,7 +65,7 @@ func (c *conn) handleQueryLiteral(l *lex) error {
 	case `ROLLBACK`:
 		return c.handleRollback()
 	default:
-		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", tokens[0].Value))
+		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", l.Get(0).Value))
 	}
 }
 
@@ -65,16 +73,20 @@ func (c *conn) isInTransaction() bool {
 	return c.status&SERVER_STATUS_IN_TRANS > 0
 }
 
+func (c *conn) isAutoCommit() bool {
+	return c.status&SERVER_STATUS_AUTOCOMMIT > 0
+}
+
 func (c *conn) handleBegin() error {
 	c.status |= SERVER_STATUS_IN_TRANS
-	return c.writeOK(&Result{Status: c.status})
+	return c.writeOK(nil)
 }
 
 func (c *conn) handleCommit() (err error) {
 	if err := c.commit(); err != nil {
 		return err
 	} else {
-		return c.writeOK(&Result{Status: c.status})
+		return c.writeOK(nil)
 	}
 }
 
@@ -82,7 +94,7 @@ func (c *conn) handleRollback() (err error) {
 	if err := c.rollback(); err != nil {
 		return err
 	} else {
-		return c.writeOK(&Result{Status: c.status})
+		return c.writeOK(nil)
 	}
 }
 
@@ -118,8 +130,15 @@ type comQueryer interface {
 
 type routeFunc func(name string, q comQueryer, query string) interface{}
 
+//if status is in_trans, need
+//else if status is not autocommit, need
+//else no need
+func (c *conn) needBeginTx() bool {
+	return c.isInTransaction() || !c.isAutoCommit()
+}
+
 func (c *conn) getQueryer(n *node) (comQueryer, error) {
-	if !c.isInTransaction() {
+	if !c.needBeginTx() {
 		return n, nil
 	} else {
 		c.Lock()

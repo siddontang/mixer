@@ -76,7 +76,7 @@ func (c *conn) Handshake() error {
 		return err
 	}
 
-	if err := c.writeOK(&Result{Status: c.status}); err != nil {
+	if err := c.writeOK(nil); err != nil {
 		log.Error("write ok fail %s", err.Error())
 		return err
 	}
@@ -220,7 +220,7 @@ func (c *conn) dispatch(data []byte) error {
 	case COM_QUERY:
 		return c.comQuery(data[1:])
 	case COM_PING:
-		return c.writeOK(&Result{Status: c.status})
+		return c.writeOK(nil)
 	case COM_INIT_DB:
 		return c.useDB(string(data[1:]))
 	default:
@@ -242,6 +242,9 @@ func (c *conn) useDB(db string) error {
 }
 
 func (c *conn) writeOK(r *Result) error {
+	if r == nil {
+		r = &Result{Status: c.status}
+	}
 	data := make([]byte, 4, 32)
 
 	data = append(data, OK_HEADER)

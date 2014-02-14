@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	. "mysql"
 	"sync"
 	"testing"
 	"time"
@@ -8,6 +9,8 @@ import (
 
 var testServerOnce sync.Once
 var testServer *Server
+var testDBOnce sync.Once
+var testDB *DB
 
 func newTestServer() *Server {
 	f := func() {
@@ -36,6 +39,17 @@ func newTestServer() *Server {
 	testServerOnce.Do(f)
 
 	return testServer
+}
+
+func newTestDB() *DB {
+	newTestServer()
+
+	f := func() {
+		testDB = NewDB("127.0.0.1:4000", "root", "", "mixer", 16)
+	}
+
+	testDBOnce.Do(f)
+	return testDB
 }
 
 func TestServer(t *testing.T) {
