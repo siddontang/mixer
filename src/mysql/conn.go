@@ -25,7 +25,8 @@ type conn struct {
 
 	capability uint32
 
-	//status  uint16
+	status uint16
+
 	charset byte
 	salt    []byte
 
@@ -127,7 +128,7 @@ func (c *conn) readInitialHandshake() error {
 		//c.charset = data[pos]
 		pos += 1
 
-		//c.status = binary.LittleEndian.Uint16(data[pos : pos+2])
+		c.status = binary.LittleEndian.Uint16(data[pos : pos+2])
 		pos += 2
 
 		c.capability = uint32(binary.LittleEndian.Uint16(data[pos:pos+2]))<<16 | c.capability
@@ -468,6 +469,13 @@ func (c *conn) readResultColumns(result *resultsetPacket) (err error) {
 
 		// EOF Packet
 		if c.isEOFPacket(data) {
+			if c.capability&CLIENT_PROTOCOL_41 > 0 {
+				//result.Warnings = binary.LittleEndian.Uint16(data[1:])
+				//todo add strict_mode, warning will be treat as error
+				result.Status = binary.LittleEndian.Uint16(data[3:])
+				c.status = result.Status
+			}
+
 			if i != len(result.Fields) {
 				log.Error("ColumnsCount mismatch n:%d len:%d", i, len(result.Fields))
 				err = ErrMalformPacket
@@ -498,6 +506,7 @@ func (c *conn) readResultRows(result *resultsetPacket) (err error) {
 				//result.Warnings = binary.LittleEndian.Uint16(data[1:])
 				//todo add strict_mode, warning will be treat as error
 				result.Status = binary.LittleEndian.Uint16(data[3:])
+				c.status = result.Status
 			}
 
 			return
@@ -542,11 +551,16 @@ func (c *conn) handleOKPacket(data []byte) (*Result, error) {
 
 	if c.capability&CLIENT_PROTOCOL_41 > 0 {
 		r.Status = binary.LittleEndian.Uint16(data[pos:])
+		c.status = r.Status
 		pos += 2
 
 		//todo:strict_mode, check warnings as error
 		//Warnings := binary.LittleEndian.Uint16(data[pos:])
 		//pos += 2
+	} else if c.capability&CLIENT_TRANSACTIONS > 0 {
+		r.Status = binary.LittleEndian.Uint16(data[pos:])
+		c.status = r.Status
+		pos += 2
 	}
 
 	//info
@@ -586,4 +600,12 @@ func (c *conn) readOK() (*Result, error) {
 	} else {
 		return nil, errors.New("invalid ok packet")
 	}
+}
+
+func (c *conn) isAutoCommit() bool {
+	return c.status&SERVER_STATUS_AUTOCOMMIT > 0
+}
+
+func (c *conn) isInTransaction() bool {
+	return c.status&SERVER_STATUS_IN_TRANS > 0
 }

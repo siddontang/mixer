@@ -214,6 +214,14 @@ func TestDB_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !tx1.conn.isInTransaction() {
+		t.Fatal("tx1 not in transaction")
+	}
+
+	if !tx2.conn.isInTransaction() {
+		t.Fatal("tx2 not in transaction")
+	}
+
 	if _, err := tx1.Exec(`insert into mixer_test (id, str) values (111, "abc")`); err != nil {
 		t.Fatal(err)
 	}
@@ -232,6 +240,14 @@ func TestDB_Trans(t *testing.T) {
 
 	if err := tx2.Commit(); err != nil {
 		t.Fatal(err)
+	}
+
+	if tx1.conn.isInTransaction() {
+		t.Fatal("tx1 in transaction")
+	}
+
+	if tx2.conn.isInTransaction() {
+		t.Fatal("tx2 in transaction")
 	}
 
 	if r, err := db.Query(`select str from mixer_test where id = ?`, 111); err != nil {

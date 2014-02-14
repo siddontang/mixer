@@ -60,11 +60,13 @@ func (db *DB) newConn() (*dbConn, error) {
 	}
 
 	//we must always use autocommit
-	if _, err := co.Exec("set autocommit = 1"); err != nil {
-		log.Error("set autocommit error %s", err.Error())
-		co.Close()
+	if !co.isAutoCommit() {
+		if _, err := co.Exec("set autocommit = 1"); err != nil {
+			log.Error("set autocommit error %s", err.Error())
+			co.Close()
 
-		return nil, err
+			return nil, err
+		}
 	}
 
 	dc := new(dbConn)
@@ -87,12 +89,17 @@ func (db *DB) popConn() (co *dbConn, err error) {
 	if co != nil {
 		co.Lock()
 		if err := co.Ping(); err == nil {
-			co.Unlock()
-			//connection may alive
-			return co, nil
-		} else {
-			co.closed = true
+			if co.isInTransaction() {
+				//we can not reuse a connection in transaction status
+				log.Error("reuse connection can not in transaction status")
+			} else {
+				co.Unlock()
+				//connection may alive
+				return co, nil
+			}
 		}
+
+		co.Close()
 		co.Unlock()
 	}
 
