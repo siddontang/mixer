@@ -226,6 +226,19 @@ func TestDB_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var s *Stmt
+	if s, err = tx1.Prepare(`select str from mixer_test where id = ?`); err != nil {
+		t.Fatal(err)
+	}
+
+	if r, err := s.Query(111); err != nil {
+		t.Fatal(err)
+	} else {
+		if s, _ := r.GetString(0, 0); s != "abc" {
+			t.Fatal(s)
+		}
+	}
+
 	if r, err := tx2.Query(`select str from mixer_test where id = ?`, 111); err != nil {
 		t.Fatal(err)
 	} else {
@@ -258,4 +271,11 @@ func TestDB_Trans(t *testing.T) {
 		}
 	}
 
+	if r, err := s.Query(111); err != nil {
+		t.Fatal(err)
+	} else {
+		if s, _ := r.GetString(0, 0); s != "abc" {
+			t.Fatal(s)
+		}
+	}
 }

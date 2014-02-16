@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -140,46 +139,6 @@ func TestStmt_Select(t *testing.T) {
 	}
 
 	s.Close()
-}
-
-func TestStmt_ResultsetDump(t *testing.T) {
-	str := `select * from mixer_test_stmt where id = ?`
-
-	c := newTestConn()
-	defer c.Close()
-
-	s, err := c.Prepare(str)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if result, err := s.Query(1); err != nil {
-		t.Fatal(err)
-	} else {
-		p := new(resultsetPacket)
-		p.Status = result.Status
-
-		for i := range result.Fields {
-			p.Fields = append(p.Fields, fieldPacket(result.Fields[i].Dump()))
-		}
-
-		if rows, err := result.DumpRows(); err != nil {
-			t.Fatal(err)
-		} else {
-			for i := range rows {
-				p.Rows = append(p.Rows, rowPacket(rows[i]))
-			}
-		}
-
-		if r, err := p.Parse(true); err != nil {
-			t.Fatal(err)
-		} else {
-			if !reflect.DeepEqual(r, result) {
-				t.Fatal("result set not equal")
-			}
-		}
-
-	}
 }
 
 func TestStmt_NULL(t *testing.T) {

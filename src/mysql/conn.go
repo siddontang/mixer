@@ -366,7 +366,7 @@ func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
 		return nil, err
 	}
 
-	columns := make([]fieldPacket, 0)
+	columns := make([][]byte, 0)
 
 	if data[0] == ERR_HEADER {
 		return nil, c.handleErrorPacket(data)
@@ -393,7 +393,7 @@ func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
 	f := make([]Field, len(columns))
 
 	for i := range columns {
-		f[i], err = columns[i].Parse()
+		f[i], err = parseField(columns[i])
 		if err != nil {
 			return nil, err
 		}
@@ -453,8 +453,8 @@ func (c *conn) readResultset() (*resultsetPacket, error) {
 		return nil, ErrMalformPacket
 	}
 
-	result.Fields = make([]fieldPacket, count)
-	result.Rows = make([]rowPacket, 0)
+	result.Fields = make([][]byte, count)
+	result.Rows = make([][]byte, 0)
 
 	if err := c.readResultColumns(result); err != nil {
 		return nil, err

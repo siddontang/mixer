@@ -19,48 +19,12 @@ type Field struct {
 	Flag         uint16
 	Decimal      uint8
 
-	//below if command was fieldlist
-	DefaultValueLength uint64
-	DefaultValue       []byte
-
-	isFieldList bool
+	Packet []byte
 }
 
-func (f Field) Dump() []byte {
-	l := len(f.Schema) + len(f.Table) + len(f.OrgTable) + len(f.Name) + len(f.OrgName) + len(f.DefaultValue) + 48
+func parseField(p []byte) (f Field, err error) {
+	f.Packet = p
 
-	data := make([]byte, 0, l)
-
-	data = append(data, PutLengthEncodedString([]byte("def"))...)
-
-	data = append(data, PutLengthEncodedString(f.Schema)...)
-
-	data = append(data, PutLengthEncodedString(f.Table)...)
-	data = append(data, PutLengthEncodedString(f.OrgTable)...)
-
-	data = append(data, PutLengthEncodedString(f.Name)...)
-	data = append(data, PutLengthEncodedString(f.OrgName)...)
-
-	data = append(data, 0x0c)
-
-	data = append(data, Uint16ToBytes(f.Charset)...)
-	data = append(data, Uint32ToBytes(f.ColumnLength)...)
-	data = append(data, f.Type)
-	data = append(data, Uint16ToBytes(f.Flag)...)
-	data = append(data, f.Decimal)
-	data = append(data, 0, 0)
-
-	if f.isFieldList {
-		data = append(data, Uint64ToBytes(f.DefaultValueLength)...)
-		data = append(data, f.DefaultValue...)
-	}
-
-	return data
-}
-
-type fieldPacket []byte
-
-func (p fieldPacket) Parse() (f Field, err error) {
 	var n int
 	pos := 0
 	//skip catelog, always def
@@ -129,39 +93,21 @@ func (p fieldPacket) Parse() (f Field, err error) {
 	pos++
 
 	//filter [0x00][0x00]
-	pos += 2
+	//pos += 2
 
 	//if more data, command was field list
-	if pos < len(p) {
-		f.isFieldList = true
-
-		//length of default value lenenc-int
-		f.DefaultValueLength, _, n = LengthEncodedInt(p[pos:])
-		pos += n
-
-		if pos+int(f.DefaultValueLength) > len(p) {
-			err = ErrMalformPacket
-			return
-		}
-
-		//default value string[$len]
-		f.DefaultValue = p[pos:(pos + int(f.DefaultValueLength))]
-	}
-
 	return
 }
 
-type rowPacket []byte
-
-func (p rowPacket) Parse(f []Field, binary bool) ([]interface{}, error) {
+func parseRow(p []byte, f []Field, binary bool) ([]interface{}, error) {
 	if binary {
-		return p.ParseBinary(f)
+		return parseBinaryRow(p, f)
 	} else {
-		return p.ParseText(f)
+		return parseTextRow(p, f)
 	}
 }
 
-func (p rowPacket) ParseText(f []Field) ([]interface{}, error) {
+func parseTextRow(p []byte, f []Field) ([]interface{}, error) {
 	data := make([]interface{}, len(f))
 
 	var err error
@@ -206,7 +152,7 @@ func (p rowPacket) ParseText(f []Field) ([]interface{}, error) {
 	return data, nil
 }
 
-func (p rowPacket) ParseBinary(f []Field) ([]interface{}, error) {
+func parseBinaryRow(p []byte, f []Field) ([]interface{}, error) {
 	data := make([]interface{}, len(f))
 
 	if p[0] != OK_HEADER {
@@ -362,14 +308,13 @@ func (p rowPacket) ParseBinary(f []Field) ([]interface{}, error) {
 
 type resultsetPacket struct {
 	Status uint16
-	Fields []fieldPacket
-	Rows   []rowPacket
+	Fields [][]byte
+	Rows   [][]byte
 }
 
 func (p *resultsetPacket) Parse(binary bool) (*Resultset, error) {
 	r := new(Resultset)
 
-	r.binary = binary
 	r.Status = p.Status
 
 	r.Fields = make([]Field, len(p.Fields))
@@ -377,7 +322,7 @@ func (p *resultsetPacket) Parse(binary bool) (*Resultset, error) {
 
 	var err error
 	for i := range r.Fields {
-		r.Fields[i], err = p.Fields[i].Parse()
+		r.Fields[i], err = parseField(p.Fields[i])
 		if err != nil {
 			return nil, err
 		}
@@ -387,24 +332,26 @@ func (p *resultsetPacket) Parse(binary bool) (*Resultset, error) {
 
 	r.Data = make([][]interface{}, len(p.Rows))
 	for i := range r.Data {
-		r.Data[i], err = p.Rows[i].Parse(r.Fields, binary)
+		r.Data[i], err = parseRow(p.Rows[i], r.Fields, binary)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	r.RowPackets = p.Rows
+
 	return r, nil
 }
 
 type Resultset struct {
-	binary bool //test resultset is text or binary
-
 	Status uint16 //server status for this query resultset
 
 	Fields     []Field
 	FieldNames map[string]int
 
 	Data [][]interface{}
+
+	RowPackets [][]byte
 }
 
 func (r *Resultset) GetStatus() uint16 {
@@ -549,6 +496,12 @@ func (r *Resultset) GetString(row, column int) (string, error) {
 		return v, nil
 	case []byte:
 		return string(v), nil
+	case int64:
+		return strconv.FormatInt(v, 10), nil
+	case uint64:
+		return strconv.FormatUint(v, 10), nil
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case nil:
 		return "", nil
 	default:
@@ -562,128 +515,6 @@ func (r *Resultset) GetStringByName(row int, name string) (string, error) {
 	} else {
 		return "", fmt.Errorf("invalid field name %s", name)
 	}
-}
-
-func (r *Resultset) DumpRows() ([][]byte, error) {
-	if r.binary {
-		return r.dumpBinary()
-	} else {
-		return r.dumpText()
-	}
-}
-
-func (r *Resultset) dumpBinary() ([][]byte, error) {
-	rows := make([][]byte, len(r.Data))
-
-	var err error
-	for i := range rows {
-		rows[i], err = r.dumpBinaryRow(r.Data[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return rows, nil
-}
-
-func (r *Resultset) dumpUint(v uint64, tp byte) ([]byte, error) {
-	switch tp {
-	case MYSQL_TYPE_TINY:
-		return []byte{byte(v)}, nil
-	case MYSQL_TYPE_SHORT, MYSQL_TYPE_YEAR:
-		return Uint16ToBytes(uint16(v)), nil
-	case MYSQL_TYPE_INT24, MYSQL_TYPE_LONG:
-		return Uint32ToBytes(uint32(v)), nil
-	case MYSQL_TYPE_LONGLONG:
-		return Uint64ToBytes(v), nil
-	default:
-		return nil, fmt.Errorf("invalid field type %d", tp)
-	}
-}
-
-func (r *Resultset) dumpBinaryRow(data []interface{}) ([]byte, error) {
-	//NULL-bitmap, length: (column-count + 7 + 2) / 8
-	nullBitmapLenght := ((len(data) + 7 + 2) >> 3)
-
-	row := make([]byte, 1+nullBitmapLenght, 1024)
-	row[0] = OK_HEADER
-
-	for p, i := range data {
-		tp := r.Fields[p].Type
-		switch v := i.(type) {
-		case nil:
-			row[1+(p+2)/8] |= (1 << (uint(p+2) % 8))
-		case int64:
-			if d, err := r.dumpUint(uint64(v), tp); err != nil {
-				return nil, err
-			} else {
-				row = append(row, d...)
-			}
-		case uint64:
-			if d, err := r.dumpUint(uint64(v), tp); err != nil {
-				return nil, err
-			} else {
-				row = append(row, d...)
-			}
-		case float64:
-			if tp == MYSQL_TYPE_FLOAT {
-				row = append(row, Uint32ToBytes(math.Float32bits(float32(v)))...)
-			} else if tp == MYSQL_TYPE_DOUBLE {
-				row = append(row, Uint64ToBytes(math.Float64bits(v))...)
-			} else {
-				return nil, fmt.Errorf("invalid field type %d", tp)
-			}
-		case []byte:
-			row = append(row, PutLengthEncodedString(v)...)
-		case string:
-			row = append(row, PutLengthEncodedString([]byte(v))...)
-		default:
-			return nil, fmt.Errorf("invalid type %T", v)
-		}
-	}
-	return row, nil
-}
-
-func (r *Resultset) dumpText() ([][]byte, error) {
-	rows := make([][]byte, len(r.Data))
-
-	var err error
-	for i := range rows {
-		rows[i], err = r.dumpTextRow(r.Data[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return rows, nil
-}
-
-func (r *Resultset) dumpTextRow(data []interface{}) ([]byte, error) {
-	row := make([]byte, 0, 1024)
-
-	for _, i := range data {
-		switch v := i.(type) {
-		case nil:
-			row = append(row, 0xfb)
-		case int64:
-			s := strconv.FormatInt(v, 10)
-			row = append(row, PutLengthEncodedString([]byte(s))...)
-		case uint64:
-			s := strconv.FormatUint(v, 10)
-			row = append(row, PutLengthEncodedString([]byte(s))...)
-		case float64:
-			s := strconv.FormatFloat(v, 'f', -1, 64)
-			row = append(row, PutLengthEncodedString([]byte(s))...)
-		case []byte:
-			row = append(row, PutLengthEncodedString(v)...)
-		case string:
-			row = append(row, PutLengthEncodedString([]byte(v))...)
-		default:
-			return nil, fmt.Errorf("invalid type %T", i)
-		}
-	}
-
-	return row, nil
 }
 
 type Result struct {

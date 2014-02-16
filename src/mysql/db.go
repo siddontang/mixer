@@ -264,8 +264,8 @@ type Stmt struct {
 	stmts map[*dbConn]*stmt
 
 	//in transaction
-	txConn *dbConn
 	txStmt *stmt
+	tx     *Tx
 }
 
 func newStmt(db *DB, query string) *Stmt {
@@ -275,24 +275,39 @@ func newStmt(db *DB, query string) *Stmt {
 	s.str = query
 	s.stmts = make(map[*dbConn]*stmt)
 
-	s.txConn = nil
 	s.txStmt = nil
+	s.tx = nil
 
 	return s
 }
 
 func (s *Stmt) txQuery(args ...interface{}) (*Resultset, error) {
-	s.txConn.Lock()
+	if s.tx.done {
+		s.txClose()
+		return nil, ErrTxDone
+	}
+
+	c := s.tx.conn
+
+	c.Lock()
 	r, err := s.txStmt.Query(args...)
-	s.txConn.Unlock()
+	c.Unlock()
 
 	return r, err
 }
 
 func (s *Stmt) txExec(args ...interface{}) (*Result, error) {
-	s.txConn.Lock()
+	if s.tx.done {
+		s.txClose()
+
+		return nil, ErrTxDone
+	}
+
+	c := s.tx.conn
+
+	c.Lock()
 	r, err := s.txStmt.Exec(args...)
-	s.txConn.Unlock()
+	c.Unlock()
 
 	return r, err
 }
@@ -320,8 +335,14 @@ func (s *Stmt) prepare(query string) (conn *dbConn, st *stmt, err error) {
 }
 
 func (s *Stmt) Exec(args ...interface{}) (r *Result, err error) {
-	if s.txConn != nil {
-		return s.txExec(args...)
+	if s.tx != nil {
+		if r, err = s.txExec(args...); err == nil {
+			return
+		} else if err != ErrTxDone {
+			return
+		}
+
+		//if err is ErrTxDone, we will use other conn
 	}
 
 	for i := 0; i < 10; i++ {
@@ -348,8 +369,14 @@ func (s *Stmt) exec(args ...interface{}) (*Result, error) {
 }
 
 func (s *Stmt) Query(args ...interface{}) (r *Resultset, err error) {
-	if s.txConn != nil {
-		return s.txQuery(args...)
+	if s.tx != nil {
+		if r, err = s.txQuery(args...); err == nil {
+			return
+		} else if err != ErrTxDone {
+			return
+		}
+
+		//if err is ErrTxDone, we will use other conn
 	}
 
 	for i := 0; i < 10; i++ {
@@ -376,17 +403,19 @@ func (s *Stmt) query(args ...interface{}) (*Resultset, error) {
 }
 
 func (s *Stmt) txClose() (err error) {
-	s.txConn.Lock()
-	if !s.txConn.closed {
+	c := s.tx.conn
+	c.Lock()
+	if !c.closed {
 		err = s.txStmt.Close()
 	}
-	s.txConn.Unlock()
+	c.Unlock()
+	s.tx = nil
 	return
 
 }
 
 func (s *Stmt) Close() (err error) {
-	if s.txConn != nil {
+	if s.tx != nil {
 		return s.txClose()
 	}
 
@@ -403,6 +432,7 @@ func (s *Stmt) Close() (err error) {
 }
 
 type Tx struct {
+	sync.Mutex
 	db   *DB
 	done bool
 	conn *dbConn
@@ -445,7 +475,7 @@ func (t *Tx) Prepare(query string) (*Stmt, error) {
 		return nil, err
 	}
 
-	s.txConn = t.conn
+	s.tx = t
 	s.txStmt = st
 
 	return s, nil
