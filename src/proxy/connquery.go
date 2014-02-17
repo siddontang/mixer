@@ -13,6 +13,7 @@ import (
 type lex struct {
 	Query  string
 	Tokens []Token
+	Args   []interface{} //for stmt args
 }
 
 func (l *lex) Get(index int) Token {
@@ -23,20 +24,29 @@ func (l *lex) Get(index int) Token {
 	}
 }
 
-func (c *conn) comQuery(data []byte) error {
-	tokens, err := Tokenizer(string(data))
+func parseQuery(query string) (*lex, error) {
+	tokens, err := Tokenizer(query)
 
+	if err != nil {
+		return nil, err
+	}
+
+	if len(tokens) == 0 {
+		return nil, errors.New("No Token")
+	}
+
+	l := &lex{query, tokens, nil}
+
+	return l, nil
+}
+
+func (c *conn) handleQuery(data []byte) error {
+	l, err := parseQuery(string(data))
 	if err != nil {
 		return err
 	}
 
-	if len(tokens) == 0 {
-		return errors.New("No Token")
-	}
-
-	l := &lex{string(data), tokens}
-
-	switch tokens[0].Type {
+	switch l.Get(0).Type {
 	case TK_SQL_SELECT:
 		return c.handleSelect(l)
 	case TK_SQL_INSERT:
@@ -123,12 +133,13 @@ func (c *conn) rollback() (err error) {
 	return
 }
 
-type comQueryer interface {
+type dbQueryer interface {
+	Prepare(query string) (*Stmt, error)
 	Query(query string, args ...interface{}) (*Resultset, error)
 	Exec(query string, args ...interface{}) (*Result, error)
 }
 
-type routeFunc func(name string, q comQueryer, query string) interface{}
+type routeFunc func(name string, q dbQueryer, query string, args ...interface{}) interface{}
 
 //if status is in_trans, need
 //else if status is not autocommit, need
@@ -137,7 +148,7 @@ func (c *conn) needBeginTx() bool {
 	return c.isInTransaction() || !c.isAutoCommit()
 }
 
-func (c *conn) getQueryer(n *node) (comQueryer, error) {
+func (c *conn) getDBQueryer(n *node) (dbQueryer, error) {
 	if !c.needBeginTx() {
 		return n, nil
 	} else {
@@ -177,11 +188,11 @@ func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
 	ch := make(chan interface{}, len(rs))
 
 	for n, query := range rs {
-		go func(n *node, q string, f routeFunc) {
-			if queryer, err := c.getQueryer(n); err != nil {
+		go func(n *node, q routeQuery, f routeFunc) {
+			if d, err := c.getDBQueryer(n); err != nil {
 				ch <- err
 			} else {
-				ch <- f(n.Name, queryer, q)
+				ch <- f(n.Name, d, q.Query, q.Args...)
 			}
 		}(n, query, f)
 	}
@@ -201,8 +212,8 @@ LOOP:
 	return results, nil
 }
 
-func routeSelect(nodeName string, q comQueryer, query string) interface{} {
-	r, err := q.Query(query)
+func routeSelect(nodeName string, q dbQueryer, query string, args ...interface{}) interface{} {
+	r, err := q.Query(query, args...)
 	if err != nil {
 		log.Error("node %s query error %s", nodeName, err.Error())
 		return err
@@ -234,9 +245,9 @@ func mergeResultset(dest *Resultset, src *Resultset) error {
 	dest.Status |= src.Status
 
 	//later we may merge with select condition like limit, order by, etc...
-	//now we only append data
-	for _, v := range src.Data {
-		dest.Data = append(dest.Data, v)
+	//now we only append row
+	for _, v := range src.RowPackets {
+		dest.RowPackets = append(dest.RowPackets, v)
 	}
 
 	return nil
@@ -254,7 +265,7 @@ func (c *conn) writeResultset(r *Resultset) error {
 
 	for _, v := range r.Fields {
 		data = data[0:4]
-		data = append(data, v.Dump()...)
+		data = append(data, v.Packet...)
 		if err := c.WritePacket(data); err != nil {
 			return err
 		}
@@ -264,14 +275,9 @@ func (c *conn) writeResultset(r *Resultset) error {
 		return err
 	}
 
-	rows, err := r.DumpRows()
-	if err != nil {
-		return err
-	}
-
-	for i := range rows {
+	for _, v := range r.RowPackets {
 		data = data[0:4]
-		data = append(data, rows[i]...)
+		data = append(data, v...)
 		if err := c.WritePacket(data); err != nil {
 			return err
 		}
@@ -321,8 +327,8 @@ LOOP:
 	}
 }
 
-func routeExec(nodeName string, q comQueryer, query string) interface{} {
-	r, err := q.Exec(query)
+func routeExec(nodeName string, q dbQueryer, query string, args ...interface{}) interface{} {
+	r, err := q.Exec(query, args...)
 	if err != nil {
 		log.Error("node %s exec error %s", nodeName, err.Error())
 		return err

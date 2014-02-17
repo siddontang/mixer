@@ -8,6 +8,7 @@ import (
 	"lib/log"
 	. "mysql"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -39,6 +40,11 @@ type conn struct {
 	curSchema *schema
 
 	txs map[*node]*Tx
+
+	stmtId uint32
+	stmts  map[uint32]*stmt
+
+	closed bool
 }
 
 var baseConnId uint32 = 10000
@@ -58,6 +64,11 @@ func newconn(s *Server, co net.Conn) *conn {
 	c.salt, _ = RandomBuf(20)
 
 	c.txs = make(map[*node]*Tx)
+	c.stmts = make(map[uint32]*stmt)
+
+	c.closed = false
+
+	c.stmtId = 0
 
 	return c
 }
@@ -87,9 +98,15 @@ func (c *conn) Handshake() error {
 }
 
 func (c *conn) Close() error {
+	if c.closed {
+		return nil
+	}
+
 	c.Conn.Close()
 
 	c.rollback()
+
+	c.closed = true
 
 	return nil
 }
@@ -194,6 +211,19 @@ func (c *conn) readHandshakeResponse() error {
 }
 
 func (c *conn) Run() {
+	defer func() {
+		r := recover()
+		if err, ok := r.(error); ok {
+			const size = 4096
+			buf := make([]byte, size)
+			buf = buf[:runtime.Stack(buf, false)]
+
+			log.Error("%v, %s", err, buf)
+		}
+
+		c.Close()
+	}()
+
 	for {
 		data, err := c.ReadPacket()
 
@@ -216,15 +246,28 @@ func (c *conn) Run() {
 }
 
 func (c *conn) dispatch(data []byte) error {
-	switch data[0] {
+	cmd := data[0]
+	data = data[1:]
+
+	switch cmd {
 	case COM_QUERY:
-		return c.comQuery(data[1:])
+		return c.handleQuery(data)
 	case COM_PING:
 		return c.writeOK(nil)
 	case COM_INIT_DB:
-		return c.useDB(string(data[1:]))
+		return c.useDB(string(data))
+	case COM_STMT_PREPARE:
+		return c.handleStmtPrepare(data)
+	case COM_STMT_EXECUTE:
+		return c.handleStmtExecute(data)
+	case COM_STMT_CLOSE:
+		return c.handleStmtClose(data)
+	case COM_STMT_SEND_LONG_DATA:
+		return c.handleStmtSendLongData(data)
+	case COM_STMT_RESET:
+		return c.handleStmtReset(data)
 	default:
-		msg := fmt.Sprintf("command %d not supported now", data[0])
+		msg := fmt.Sprintf("command %d not supported now", cmd)
 		return NewError(ER_UNKNOWN_ERROR, msg)
 	}
 
