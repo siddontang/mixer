@@ -278,4 +278,6 @@ func TestDB_Trans(t *testing.T) {
 			t.Fatal(s)
 		}
 	}
+
+	s.Close()
 }

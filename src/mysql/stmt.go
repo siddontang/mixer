@@ -10,8 +10,8 @@ type stmt struct {
 	conn    *conn
 	id      uint32
 	query   string
-	columns uint16
-	params  uint16
+	params  []Field
+	columns []Field
 }
 
 func (s *stmt) Exec(args ...interface{}) (*Result, error) {
@@ -43,17 +43,21 @@ func (s *stmt) Close() error {
 }
 
 func (s *stmt) write(args ...interface{}) error {
-	if len(args) != int(s.params) {
+	paramsNum := len(s.params)
+
+	if len(args) != paramsNum {
 		return fmt.Errorf("argument mismatch, need %d but got %d", s.params, len(args))
 	}
 
-	paramTypes := make([]byte, s.params<<1)
-	paramValues := make([][]byte, s.params)
+	paramTypes := make([]byte, paramsNum<<1)
+	paramValues := make([][]byte, paramsNum)
 
 	//NULL-bitmap, length: (num-params+7)
-	nullBitmap := make([]byte, (s.params+7)>>3)
+	nullBitmap := make([]byte, (paramsNum+7)>>3)
 
-	var length int = int(1 + 4 + 1 + 4 + ((s.params + 7) >> 3) + 1 + (s.params << 1))
+	var length int = int(1 + 4 + 1 + 4 + ((paramsNum + 7) >> 3) + 1 + (paramsNum << 1))
+
+	var newParamBoundFlag byte = 0
 
 	for i := range args {
 		if args[i] == nil {
@@ -61,6 +65,8 @@ func (s *stmt) write(args ...interface{}) error {
 			paramTypes[i<<1] = MYSQL_TYPE_NULL
 			continue
 		}
+
+		newParamBoundFlag = 1
 
 		switch v := args[i].(type) {
 		case int8:
@@ -136,18 +142,20 @@ func (s *stmt) write(args ...interface{}) error {
 	//iteration-count, always 1
 	data = append(data, 1, 0, 0, 0)
 
-	if s.params > 0 {
+	if len(s.params) > 0 {
 		data = append(data, nullBitmap...)
 
-		//new-params-bound-flag: 1
-		data = append(data, 1)
+		//new-params-bound-flag
+		data = append(data, newParamBoundFlag)
 
-		//type of each parameter, length: num-params * 2
-		data = append(data, paramTypes...)
+		if newParamBoundFlag == 1 {
+			//type of each parameter, length: num-params * 2
+			data = append(data, paramTypes...)
 
-		//value of each parameter
-		for _, v := range paramValues {
-			data = append(data, v...)
+			//value of each parameter
+			for _, v := range paramValues {
+				data = append(data, v...)
+			}
 		}
 	}
 
@@ -182,27 +190,55 @@ func (c *conn) Prepare(query string) (*stmt, error) {
 	pos += 4
 
 	//number columns
-	s.columns = binary.LittleEndian.Uint16(data[pos:])
+	columns := binary.LittleEndian.Uint16(data[pos:])
 	pos += 2
 
 	//number params
-	s.params = binary.LittleEndian.Uint16(data[pos:])
+	params := binary.LittleEndian.Uint16(data[pos:])
 	pos += 2
 
 	//warnings
 	//warnings = binary.LittleEndian.Uint16(data[pos:])
 
-	if s.columns > 0 {
-		err = s.conn.readUntilEOF()
-		if err != nil {
-			return nil, err
+	if params > 0 {
+		s.params = make([]Field, 0, params)
+
+		for {
+			data, err := s.conn.ReadPacket()
+			if err != nil {
+				return nil, err
+			}
+
+			if s.conn.isEOFPacket(data) {
+				break
+			}
+
+			if f, err := parseField(data); err != nil {
+				return nil, err
+			} else {
+				s.params = append(s.params, f)
+			}
 		}
 	}
 
-	if s.params > 0 {
-		err = s.conn.readUntilEOF()
-		if err != nil {
-			return nil, err
+	if columns > 0 {
+		s.columns = make([]Field, 0, columns)
+
+		for {
+			data, err := s.conn.ReadPacket()
+			if err != nil {
+				return nil, err
+			}
+
+			if s.conn.isEOFPacket(data) {
+				break
+			}
+
+			if f, err := parseField(data); err != nil {
+				return nil, err
+			} else {
+				s.columns = append(s.columns, f)
+			}
 		}
 	}
 

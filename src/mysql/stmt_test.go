@@ -255,7 +255,7 @@ func TestStmt_Signed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(3, 255); err == nil {
+	if _, err := s.Exec(4, 127); err != nil {
 		t.Fatal(err)
 	}
 

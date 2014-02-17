@@ -51,6 +51,27 @@ func NewDB(addr string, user string, password string, db string, maxIdleConns in
 	return d
 }
 
+func (db *DB) Close() error {
+	db.Lock()
+
+	for {
+		if db.conns.Len() > 0 {
+			v := db.conns.Back()
+			co := v.Value.(*dbConn)
+			db.conns.Remove(v)
+
+			co.Close()
+
+		} else {
+			break
+		}
+	}
+
+	db.Unlock()
+
+	return nil
+}
+
 func (db *DB) newConn() (*dbConn, error) {
 	co := new(conn)
 
@@ -266,6 +287,9 @@ type Stmt struct {
 	//in transaction
 	txStmt *stmt
 	tx     *Tx
+
+	Params  []Field
+	Columns []Field
 }
 
 func newStmt(db *DB, query string) *Stmt {
@@ -326,6 +350,9 @@ func (s *Stmt) prepare(query string) (conn *dbConn, st *stmt, err error) {
 	conn.Lock()
 	st, err = conn.Prepare(query)
 	conn.Unlock()
+
+	s.Params = st.params
+	s.Columns = st.columns
 
 	if err == nil {
 		s.stmts[conn] = st
@@ -477,6 +504,9 @@ func (t *Tx) Prepare(query string) (*Stmt, error) {
 
 	s.tx = t
 	s.txStmt = st
+
+	s.Params = st.params
+	s.Columns = st.columns
 
 	return s, nil
 }
