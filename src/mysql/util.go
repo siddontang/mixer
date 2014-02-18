@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"unicode/utf8"
 )
 
 func CalcPassword(scramble, password []byte) []byte {
@@ -249,15 +250,17 @@ func FormatBinaryTime(n int, data []byte) ([]byte, error) {
 	}
 }
 
+//only support utf8
 func Escape(sql string) string {
 	dest := make([]byte, 0, 2*len(sql))
 	var escape byte
-	for i := 0; i < len(sql); i++ {
-		c := sql[i]
+
+	for i := 0; i < len(sql); {
+		r, w := utf8.DecodeRuneInString(sql[i:])
 
 		escape = 0
 
-		switch c {
+		switch r {
 		case 0: /* Must be escaped for 'mysql' */
 			escape = '0'
 			break
@@ -283,8 +286,10 @@ func Escape(sql string) string {
 		if escape != 0 {
 			dest = append(dest, '\\', escape)
 		} else {
-			dest = append(dest, c)
+			dest = append(dest, sql[i:i+w]...)
 		}
+
+		i += w
 	}
 
 	return string(dest)
