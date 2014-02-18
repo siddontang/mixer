@@ -141,7 +141,5 @@ const (
 )
 
 const (
-	DEFAULT_UTF8_CHARSET byte = 33
-
 	AUTH_NAME = "mysql_native_password"
 )

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"lib/log"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -27,10 +28,12 @@ type conn struct {
 
 	status uint16
 
-	charset byte
-	salt    []byte
+	collation CollationId
+	charset   string
+	salt      []byte
 
 	lastPing int64
+	closed   bool
 }
 
 func (c *conn) Connect(addr string, user string, password string, db string) error {
@@ -40,12 +43,15 @@ func (c *conn) Connect(addr string, user string, password string, db string) err
 	c.db = db
 
 	//use utf8
-	c.charset = DEFAULT_UTF8_CHARSET
+	c.collation = DEFAULT_COLLATION_ID
+	c.charset = DEFAULT_CHARSET
 
 	return c.ReConnect()
 }
 
 func (c *conn) ReConnect() error {
+	c.closed = false
+
 	if c.Conn != nil {
 		c.Conn.Close()
 	}
@@ -80,7 +86,7 @@ func (c *conn) ReConnect() error {
 	}
 
 	//we must always use autocommit
-	if !c.isAutoCommit() {
+	if !c.IsAutoCommit() {
 		if _, err := c.Exec("set autocommit = 1"); err != nil {
 			log.Error("set autocommit error %s", err.Error())
 			c.Conn.Close()
@@ -95,9 +101,15 @@ func (c *conn) ReConnect() error {
 }
 
 func (c *conn) Close() error {
+	if c.closed {
+		return nil
+	}
+
 	if c.Conn != nil {
 		c.Conn.Close()
 	}
+
+	c.closed = true
 
 	return nil
 }
@@ -204,7 +216,7 @@ func (c *conn) writeAuthHandshake() error {
 	//data[11] = 0x00
 
 	//Charset [1 byte]
-	data[12] = c.charset
+	data[12] = byte(c.collation)
 
 	//Filler [23 bytes] (all 0x00)
 	pos := 13 + 23
@@ -354,6 +366,21 @@ func (c *conn) Commit() error {
 func (c *conn) Rollback() error {
 	_, err := c.exec("rollback")
 	return err
+}
+
+func (c *conn) SetCharset(charset string) error {
+	charset = strings.Trim(charset, "\"'`")
+	cid, ok := CharsetIds[charset]
+	if !ok {
+		return fmt.Errorf("invalid charset %s", charset)
+	}
+
+	if _, err := c.Exec(fmt.Sprintf("set names %s", charset)); err != nil {
+		return err
+	} else {
+		c.collation = cid
+		return nil
+	}
 }
 
 func (c *conn) FieldList(table, fieldWildcard string) ([]Field, error) {
@@ -612,10 +639,14 @@ func (c *conn) readOK() (*Result, error) {
 	}
 }
 
-func (c *conn) isAutoCommit() bool {
+func (c *conn) IsAutoCommit() bool {
 	return c.status&SERVER_STATUS_AUTOCOMMIT > 0
 }
 
-func (c *conn) isInTransaction() bool {
+func (c *conn) IsInTransaction() bool {
 	return c.status&SERVER_STATUS_IN_TRANS > 0
+}
+
+func (c *conn) GetCharset() string {
+	return c.charset
 }

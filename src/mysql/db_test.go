@@ -214,11 +214,11 @@ func TestDB_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !tx1.conn.isInTransaction() {
+	if !tx1.conn.IsInTransaction() {
 		t.Fatal("tx1 not in transaction")
 	}
 
-	if !tx2.conn.isInTransaction() {
+	if !tx2.conn.IsInTransaction() {
 		t.Fatal("tx2 not in transaction")
 	}
 
@@ -255,11 +255,11 @@ func TestDB_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if tx1.conn.isInTransaction() {
+	if tx1.conn.IsInTransaction() {
 		t.Fatal("tx1 in transaction")
 	}
 
-	if tx2.conn.isInTransaction() {
+	if tx2.conn.IsInTransaction() {
 		t.Fatal("tx2 in transaction")
 	}
 

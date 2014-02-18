@@ -200,9 +200,9 @@ func (c *conn) Prepare(query string) (*stmt, error) {
 	//warnings
 	//warnings = binary.LittleEndian.Uint16(data[pos:])
 
-	if params > 0 {
-		s.params = make([]Field, 0, params)
+	s.params = make([]Field, 0, params)
 
+	if params > 0 {
 		for {
 			data, err := s.conn.ReadPacket()
 			if err != nil {
@@ -221,9 +221,9 @@ func (c *conn) Prepare(query string) (*stmt, error) {
 		}
 	}
 
-	if columns > 0 {
-		s.columns = make([]Field, 0, columns)
+	s.columns = make([]Field, 0, columns)
 
+	if columns > 0 {
 		for {
 			data, err := s.conn.ReadPacket()
 			if err != nil {

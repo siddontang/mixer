@@ -155,5 +155,13 @@ func TestConn_Escape(t *testing.T) {
 			t.Fatal(str)
 		}
 	}
+}
 
+func TestConn_SetCharset(t *testing.T) {
+	c := newTestConn()
+	defer c.Close()
+
+	if err := c.SetCharset("gb2312"); err != nil {
+		t.Fatal(err)
+	}
 }
