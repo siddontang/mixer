@@ -2,7 +2,9 @@ package mysql
 
 import (
 	"container/list"
+	"fmt"
 	"lib/log"
+	"strings"
 	"sync"
 )
 
@@ -17,6 +19,8 @@ type DB struct {
 	sync.Mutex
 
 	conns *list.List
+
+	closed bool
 }
 
 type Conn struct {
@@ -28,7 +32,20 @@ type Conn struct {
 	closed bool
 }
 
+func (c *Conn) check() error {
+	if c.db.closed {
+		c.finalize()
+		return ErrBadConn
+	}
+
+	return nil
+}
+
 func (c *Conn) Query(query string, args ...interface{}) (r *Resultset, err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	r, err = c.co.Query(query, args...)
 	c.Unlock()
@@ -36,6 +53,10 @@ func (c *Conn) Query(query string, args ...interface{}) (r *Resultset, err error
 }
 
 func (c *Conn) Exec(query string, args ...interface{}) (r *Result, err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	r, err = c.co.Exec(query, args...)
 	c.Unlock()
@@ -43,6 +64,10 @@ func (c *Conn) Exec(query string, args ...interface{}) (r *Result, err error) {
 }
 
 func (c *Conn) Begin() (err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	err = c.co.Begin()
 	c.Unlock()
@@ -50,6 +75,10 @@ func (c *Conn) Begin() (err error) {
 }
 
 func (c *Conn) Commit() (err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	err = c.co.Commit()
 	c.Unlock()
@@ -57,6 +86,10 @@ func (c *Conn) Commit() (err error) {
 }
 
 func (c *Conn) Rollback() (err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	err = c.co.Rollback()
 	c.Unlock()
@@ -64,6 +97,10 @@ func (c *Conn) Rollback() (err error) {
 }
 
 func (c *Conn) Ping() (err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	err = c.co.Ping()
 	c.Unlock()
@@ -71,6 +108,10 @@ func (c *Conn) Ping() (err error) {
 }
 
 func (c *Conn) SetCharset(charset string) (err error) {
+	if err = c.check(); err != nil {
+		return
+	}
+
 	c.Lock()
 	err = c.co.SetCharset(charset)
 	c.Unlock()
@@ -78,13 +119,14 @@ func (c *Conn) SetCharset(charset string) (err error) {
 }
 
 func (c *Conn) GetCharset() (charset string) {
-	c.Lock()
-	charset = c.co.GetCharset()
-	c.Unlock()
-	return
+	return c.co.GetCharset()
 }
 
 func (c *Conn) Prepare(query string) (*Stmt, error) {
+	if err := c.check(); err != nil {
+		return nil, err
+	}
+
 	st, err := c.prepare(query)
 	if err != nil {
 		return nil, err
@@ -116,17 +158,11 @@ func (c *Conn) Close() (err error) {
 }
 
 func (c *Conn) IsInTransaction() bool {
-	c.Lock()
-	b := c.co.IsInTransaction()
-	c.Unlock()
-	return b
+	return c.co.IsInTransaction()
 }
 
 func (c *Conn) IsAutoCommit() bool {
-	c.Lock()
-	b := c.co.IsAutoCommit()
-	c.Unlock()
-	return b
+	return c.co.IsAutoCommit()
 }
 
 func (c *Conn) finalize() (err error) {
@@ -137,22 +173,61 @@ func (c *Conn) finalize() (err error) {
 	return
 }
 
-func NewDB(addr string, user string, password string, db string, maxIdleConns int) *DB {
+func NewDB(dsn string, maxIdleConns int) (*DB, error) {
 	d := new(DB)
 
-	d.addr = addr
-	d.user = user
-	d.password = password
-	d.db = db
+	if err := d.parseDSN(dsn); err != nil {
+		return nil, err
+	}
+
 	d.maxIdleConns = maxIdleConns
 
 	d.conns = list.New()
 
-	return d
+	d.closed = false
+
+	return d, nil
+}
+
+func (db *DB) Addr() string {
+	return db.addr
+}
+
+//dsn: <username>:<password>@<host>:<port>/<database>
+func (db *DB) parseDSN(dsn string) error {
+	ns := strings.Split(dsn, "@")
+	if len(ns) != 2 {
+		return fmt.Errorf("invalid dsn %s", dsn)
+	}
+
+	if us := strings.Split(ns[0], ":"); len(us) > 2 {
+		return fmt.Errorf("invalid dsn %s: error around %s", dsn, ns[0])
+	} else if len(us) == 1 {
+		db.user = us[0]
+		db.password = ""
+	} else {
+		db.user = us[0]
+		db.password = us[1]
+	}
+
+	if ds := strings.Split(ns[1], "/"); len(ds) != 2 {
+		return fmt.Errorf("invalid dsn %s, error around %s", dsn, ns[1])
+	} else {
+		db.addr = ds[0]
+		db.db = ds[1]
+	}
+	return nil
 }
 
 func (db *DB) Close() error {
 	db.Lock()
+
+	if db.closed {
+		db.Unlock()
+		return nil
+	}
+
+	db.closed = true
 
 	for {
 		if db.conns.Len() > 0 {

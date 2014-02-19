@@ -10,7 +10,7 @@ var testDB *DB
 
 func newTestDB() *DB {
 	f := func() {
-		testDB = NewDB("127.0.0.1:3306", "qing", "admin", "mixer", 16)
+		testDB, _ = NewDB("qing:admin@127.0.0.1:3306/mixer", 16)
 	}
 
 	testDBOnce.Do(f)
