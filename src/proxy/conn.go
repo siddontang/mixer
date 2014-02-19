@@ -71,6 +71,9 @@ func newconn(s *Server, co net.Conn) *conn {
 
 	c.stmtId = 0
 
+	c.collation = DEFAULT_COLLATION_ID
+	c.charset = DEFAULT_CHARSET
+
 	return c
 }
 
@@ -175,8 +178,8 @@ func (c *conn) readHandshakeResponse() error {
 	//skip max packet size
 	pos += 4
 
-	//charset
-	c.collation = CollationId(data[pos])
+	//charset, skip, if you want to use another charset, use set names
+	//c.collation = CollationId(data[pos])
 	pos++
 
 	//skip reserved 23[00]

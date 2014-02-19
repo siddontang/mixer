@@ -370,6 +370,10 @@ func (c *conn) Rollback() error {
 
 func (c *conn) SetCharset(charset string) error {
 	charset = strings.Trim(charset, "\"'`")
+	if c.charset == charset {
+		return nil
+	}
+
 	cid, ok := CharsetIds[charset]
 	if !ok {
 		return fmt.Errorf("invalid charset %s", charset)

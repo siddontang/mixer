@@ -8,10 +8,12 @@ import (
 	"strings"
 )
 
-func (c *conn) handleSetVariable(l *lex) error {
+func (c *conn) handleSet(l *lex) error {
 	switch strings.ToUpper(l.Get(1).Value) {
-	case `@@AUTOCOMMIT`, `AUTOCOMMIT`:
+	case `AUTOCOMMIT`:
 		return c.handleSetAutoCommit(l)
+	case `NAMES`:
+		return c.handleSetNames(l)
 	default:
 		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("set %s can not supported now", l.Get(1).Value))
 	}
@@ -34,6 +36,23 @@ func (c *conn) handleSetAutoCommit(l *lex) error {
 	} else {
 		return NewError(ER_UNKNOWN_ERROR, "set autocommit error")
 	}
+
+	return c.writeOK(nil)
+}
+
+func (c *conn) handleSetNames(l *lex) error {
+	if strings.ToUpper(l.Get(3).Value) == "COLLATE" {
+		return NewError(ER_UNKNOWN_ERROR, "set collate not supported now")
+	}
+
+	charset := strings.Trim(l.Get(2).Value, "\"'`")
+	cid, ok := CharsetIds[charset]
+	if !ok {
+		return fmt.Errorf("invalid charset %s", charset)
+	}
+
+	c.charset = charset
+	c.collation = cid
 
 	return c.writeOK(nil)
 }

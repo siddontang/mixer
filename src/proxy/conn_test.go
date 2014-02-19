@@ -251,3 +251,25 @@ func TestConn_Trans(t *testing.T) {
 		}
 	}
 }
+
+func TestConn_SetNames(t *testing.T) {
+	db := newTestDB()
+
+	c, err := db.GetConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if err := c.SetCharset("gb2312"); err != nil {
+		t.Fatal(err)
+	}
+
+	if r, err := c.Query("select 1 + 1"); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetInt(0, 0); v != 2 {
+			t.Fatal(v)
+		}
+	}
+}

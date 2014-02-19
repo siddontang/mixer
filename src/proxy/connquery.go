@@ -59,7 +59,7 @@ func (c *conn) handleQuery(data []byte) error {
 	case TK_SQL_REPLACE:
 		return c.handleExec(l)
 	case TK_SQL_SET:
-		return c.handleSetVariable(l)
+		return c.handleSet(l)
 	default:
 		return c.handleQueryLiteral(l)
 	}
@@ -176,6 +176,9 @@ func (c *conn) getDBConn(n *node) (co *Conn, err error) {
 	}
 
 	//todo, set conn charset, etc...
+	if err = co.SetCharset(c.charset); err != nil {
+		return
+	}
 
 	return
 }
