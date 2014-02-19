@@ -1,29 +1,36 @@
 {
     "_comment" : "proxy listen addr",
-    "addr" : ":4000",
+    "addr" : "127.0.0.1:4000",
 
     "_comment" : "proxy user and password",
-    "user": "root",
-    "password": "",
+    "user": "qing",
+    "password": "admin",
 
     "_comment" : "node represent real remote mysql instance",
+    "_comment" : "dsn:<username>:<password>@<host>:<port>/<database>",
+    "_comment": "we use first dsn as main node, other are backups ",
+    "_comment": "if main node crashed, switch to backup",
+
     "nodes" : [
         {
             "name" : "node1",
-            "addr" : "127.0.0.1:3306",
-            "user" : "root",
-            "password" : "",
-            "db" : "mixer",
             "mode" : "master",
+            "dsn" : [
+                "qing:admin@127.0.0.1:3306/mixer",
+                "qing:admin@127.0.0.1:3306/mixer"
+            ],
+            "_comment": "switch another db after N seconds when current's noalive",
+            "switch_after_noalive": 300,
             "max_idle_conns" : 16
         },
         {
             "name" : "node2",
-            "addr" : "127.0.0.1:3306",
-            "user" : "root",
-            "password" : "",
-            "db" : "mixer",
             "mode" : "slave",
+            "dsn" : [
+                "qing:admin@127.0.0.1:3306/mixer",
+                "qing:admin@127.0.0.1:3306/mixer"
+            ],
+            "switch_after_noalive": 30,
             "max_idle_conns" : 16
         }
     ],
@@ -32,8 +39,7 @@
     "schemas" : [
         {
             "db" : "mixer",
-            "nodes" : ["node1", "node2"],
-            "rw_split": true
+            "nodes" : ["node1", "node2"]
         }
     ],
 

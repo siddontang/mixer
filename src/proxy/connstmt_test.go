@@ -9,7 +9,7 @@ func TestStmt_DropTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.Exec(`drop table if exists mixer_test_proxy_stmt`); err != nil {
+		if _, err := n.db.Exec(`drop table if exists mixer_test_proxy_stmt`); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -29,7 +29,7 @@ func TestStmt_CreateTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.Exec(str); err != nil {
+		if _, err := n.db.Exec(str); err != nil {
 			t.Fatal(err)
 		}
 	}

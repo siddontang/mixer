@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"container/list"
+	"fmt"
 	"lib/log"
 	. "mysql"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -13,26 +16,53 @@ const (
 )
 
 type node struct {
+	sync.Mutex
+
 	server *Server
 	cfg    *config
 
 	Name string
 
-	*DB
+	//current running db
+	db *DB
+
+	dbs *list.List
+
+	switchAfterNoAlive time.Duration
 
 	Mode byte
-
-	Alive bool
 }
 
-func newNode(server *Server, cfgNode *configDataNode) *node {
+func newNode(server *Server, cfgNode *configDataNode) (*node, error) {
 	n := new(node)
 
 	n.Name = cfgNode.Name
 	n.server = server
 	n.cfg = server.cfg
 
-	n.DB = NewDB(cfgNode.Addr, cfgNode.User, cfgNode.Password, cfgNode.DB, cfgNode.MaxIdleConns)
+	if len(cfgNode.DSN) == 0 {
+		return nil, fmt.Errorf("no dsn set")
+	}
+
+	n.dbs = list.New()
+
+	var err error
+	var db *DB
+	for _, dsn := range cfgNode.DSN {
+		db, err = NewDB(dsn, cfgNode.MaxIdleConns)
+		if err != nil {
+			return nil, err
+		}
+		n.dbs.PushBack(db)
+	}
+
+	n.db = n.dbs.Front().Value.(*DB)
+
+	if err != nil {
+		return nil, err
+	}
+
+	n.switchAfterNoAlive = time.Duration(cfgNode.SwitchAfterNoAlive) * time.Second
 
 	switch strings.ToLower(cfgNode.Mode) {
 	case "master":
@@ -46,38 +76,65 @@ func newNode(server *Server, cfgNode *configDataNode) *node {
 
 	go n.run()
 
-	return n
+	return n, nil
+}
+
+func (n *node) GetConn() (*Conn, error) {
+	n.Lock()
+	db := n.db
+	n.Unlock()
+
+	return db.GetConn()
 }
 
 func (n *node) run() {
-	n.Alive = true
-
 	//to do
 	//1 check connection alive
 	//2 check remove mysql server alive
 
-	var errNum int = 0
-
 	t := time.NewTicker(3 * time.Second)
 	defer t.Stop()
 
+	lastPing := time.Now().Unix()
 	for {
 		select {
 		case <-t.C:
-			if err := n.Ping(); err != nil {
-				log.Error("ping error %s", err.Error())
-				errNum++
+			n.Lock()
+			db := n.db
+			n.Unlock()
+
+			if err := db.Ping(); err != nil {
+				log.Error("ping %s error %s", db.Addr(), err.Error())
 			} else {
-				errNum = 0
-				n.Alive = true
+				lastPing = time.Now().Unix()
+				break
 			}
 
-			if errNum > 3 {
-				log.Error("check alive 3 failed, disable alive")
-				n.Alive = false
+			if time.Now().Unix()-lastPing > int64(n.switchAfterNoAlive) {
+				log.Error("db %s not alive over %ds, switch another",
+					db.Addr(), int64(n.switchAfterNoAlive/time.Second))
+
+				n.switchOver()
 			}
 		}
 	}
+}
+
+func (n *node) switchOver() {
+	v := n.dbs.Front()
+	n.dbs.Remove(v)
+
+	db := v.Value.(*DB)
+
+	db.Close()
+
+	n.dbs.PushBack(db)
+
+	db = n.dbs.Front().Value.(*DB)
+
+	n.Lock()
+	n.db = db
+	n.Unlock()
 }
 
 type nodes map[string]*node
@@ -95,8 +152,15 @@ func newNodes(server *Server) nodes {
 
 	ns := make(nodes, len(cfg.Nodes))
 
+	var err error
+	var n *node
 	for _, v := range cfg.Nodes {
-		ns[v.Name] = newNode(server, &v)
+		n, err = newNode(server, &v)
+		if err != nil {
+			log.Error("new node %s error %s", v.Name, err.Error())
+		} else {
+			ns[v.Name] = n
+		}
 	}
 
 	return ns

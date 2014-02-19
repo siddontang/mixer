@@ -7,19 +7,16 @@ import (
 )
 
 type configDataNode struct {
-	Name         string `json:"name"`
-	Addr         string `json:"addr"`
-	User         string `json:"user"`
-	Password     string `json:"password"`
-	DB           string `json:"db"`
-	Mode         string `json:"mode"`
-	MaxIdleConns int    `json:"max_idle_conns"`
+	Name               string   `json:"name"`
+	DSN                []string `json:dsn`
+	Mode               string   `json:"mode"`
+	SwitchAfterNoAlive int      `json:"switch_after_noalive"`
+	MaxIdleConns       int      `json:"max_idle_conns"`
 }
 
 type configSchema struct {
-	DB      string   `json:"db"`
-	Nodes   []string `json:"nodes"`
-	RWSplit bool     `json:"rw_split"`
+	DB    string   `json:"db"`
+	Nodes []string `json:"nodes"`
 }
 
 type configServer struct {

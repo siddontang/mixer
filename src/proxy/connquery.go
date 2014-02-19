@@ -11,9 +11,10 @@ import (
 )
 
 type lex struct {
-	Query  string
-	Tokens []Token
-	Args   []interface{} //for stmt args
+	Query    string
+	Tokens   []Token
+	Args     []interface{} //for stmt args
+	Prepared bool          //check prepare statement
 }
 
 func (l *lex) Get(index int) Token {
@@ -35,7 +36,7 @@ func parseQuery(query string) (*lex, error) {
 		return nil, errors.New("No Token")
 	}
 
-	l := &lex{query, tokens, nil}
+	l := &lex{query, tokens, nil, false}
 
 	return l, nil
 }
@@ -111,13 +112,14 @@ func (c *conn) handleRollback() (err error) {
 func (c *conn) commit() (err error) {
 	c.status &= ^SERVER_STATUS_IN_TRANS
 
-	for _, tx := range c.txs {
-		if e := tx.Commit(); e != nil {
+	for _, co := range c.txConns {
+		if e := co.Commit(); e != nil {
 			err = e
 		}
+		co.Close()
 	}
 
-	c.txs = map[*node]*Tx{}
+	c.txConns = map[*node]*Conn{}
 
 	return
 }
@@ -125,21 +127,19 @@ func (c *conn) commit() (err error) {
 func (c *conn) rollback() (err error) {
 	c.status &= ^SERVER_STATUS_IN_TRANS
 
-	for _, tx := range c.txs {
-		if e := tx.Rollback(); e != nil {
+	for _, co := range c.txConns {
+		if e := co.Rollback(); e != nil {
 			err = e
 		}
+		co.Close()
 	}
+
+	c.txConns = map[*node]*Conn{}
+
 	return
 }
 
-type dbQueryer interface {
-	Prepare(query string) (*Stmt, error)
-	Query(query string, args ...interface{}) (*Resultset, error)
-	Exec(query string, args ...interface{}) (*Result, error)
-}
-
-type routeFunc func(name string, q dbQueryer, query string, args ...interface{}) interface{}
+type routeFunc func(name string, co *Conn, query string, args ...interface{}) interface{}
 
 //if status is in_trans, need
 //else if status is not autocommit, need
@@ -148,30 +148,36 @@ func (c *conn) needBeginTx() bool {
 	return c.isInTransaction() || !c.isAutoCommit()
 }
 
-func (c *conn) getDBQueryer(n *node) (dbQueryer, error) {
+func (c *conn) getDBConn(n *node) (co *Conn, err error) {
 	if !c.needBeginTx() {
-		return n, nil
+		co, err = n.GetConn()
+		if err != nil {
+			return
+		}
 	} else {
+		var ok bool
 		c.Lock()
-		tx, ok := c.txs[n]
+		co, ok = c.txConns[n]
 		c.Unlock()
 
-		if ok {
-			return tx, nil
+		if !ok {
+			if co, err = n.GetConn(); err != nil {
+				return
+			}
+
+			if err = co.Begin(); err != nil {
+				return
+			}
+
+			c.Lock()
+			c.txConns[n] = co
+			c.Unlock()
 		}
-
-		var err error
-		if tx, err = n.Begin(); err != nil {
-			log.Error("node %s begin error %s", n.Name, err.Error())
-			return nil, err
-		}
-
-		c.Lock()
-		c.txs[n] = tx
-		c.Unlock()
-
-		return tx, nil
 	}
+
+	//todo, set conn charset, etc...
+
+	return
 }
 
 func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
@@ -179,7 +185,7 @@ func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
 		return nil, NewDefaultError(ER_NO_DB_ERROR)
 	}
 
-	rs, err := c.curSchema.Route(l)
+	rs, err := c.curSchema.Route(l, c.needBeginTx())
 	if err != nil {
 		log.Error("schema route error %s", err.Error())
 		return nil, NewError(ER_UNKNOWN_ERROR, err.Error())
@@ -189,10 +195,10 @@ func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
 
 	for n, query := range rs {
 		go func(n *node, q routeQuery, f routeFunc) {
-			if d, err := c.getDBQueryer(n); err != nil {
+			if co, err := c.getDBConn(n); err != nil {
 				ch <- err
 			} else {
-				ch <- f(n.Name, d, q.Query, q.Args...)
+				ch <- f(n.Name, co, q.Query, q.Args...)
 			}
 		}(n, query, f)
 	}
@@ -212,8 +218,8 @@ LOOP:
 	return results, nil
 }
 
-func routeSelect(nodeName string, q dbQueryer, query string, args ...interface{}) interface{} {
-	r, err := q.Query(query, args...)
+func routeSelect(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
+	r, err := co.Query(query, args...)
 	if err != nil {
 		log.Error("node %s query error %s", nodeName, err.Error())
 		return err
@@ -265,7 +271,7 @@ func (c *conn) writeResultset(r *Resultset) error {
 
 	for _, v := range r.Fields {
 		data = data[0:4]
-		data = append(data, v.Packet...)
+		data = append(data, v.Dump()...)
 		if err := c.WritePacket(data); err != nil {
 			return err
 		}
@@ -327,8 +333,8 @@ LOOP:
 	}
 }
 
-func routeExec(nodeName string, q dbQueryer, query string, args ...interface{}) interface{} {
-	r, err := q.Exec(query, args...)
+func routeExec(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
+	r, err := co.Exec(query, args...)
 	if err != nil {
 		log.Error("node %s exec error %s", nodeName, err.Error())
 		return err

@@ -17,16 +17,16 @@ func newTestServer() *Server {
 		cfg := new(config)
 
 		cfg.Addr = "127.0.0.1:4000"
-		cfg.User = "root"
-		cfg.Password = ""
+		cfg.User = "qing"
+		cfg.Password = "admin"
 
 		cfg.Nodes = []configDataNode{
-			configDataNode{"node1", "127.0.0.1:3306", "root", "", "mixer", "master", 4},
-			configDataNode{"node2", "127.0.0.1:3306", "root", "", "mixer", "slave", 4},
+			configDataNode{"node1", []string{"qing:admin@127.0.0.1:3306/mixer"}, "master", 300, 4},
+			configDataNode{"node2", []string{"qing:admin@127.0.0.1:3306/mixer"}, "slave", 60, 4},
 		}
 
 		cfg.Schemas = []configSchema{
-			configSchema{"mixer", []string{"node1", "node2"}, true},
+			configSchema{"mixer", []string{"node1", "node2"}},
 		}
 
 		testServer = newServer(cfg)
@@ -45,7 +45,7 @@ func newTestDB() *DB {
 	newTestServer()
 
 	f := func() {
-		testDB = NewDB("127.0.0.1:4000", "root", "", "mixer", 16)
+		testDB, _ = NewDB("qing:admin@127.0.0.1:4000/mixer", 16)
 	}
 
 	testDBOnce.Do(f)

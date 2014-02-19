@@ -17,7 +17,7 @@ func TestConn_DeleteTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.Exec(`drop table if exists mixer_test_proxy_conn`); err != nil {
+		if _, err := n.db.Exec(`drop table if exists mixer_test_proxy_conn`); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -38,7 +38,7 @@ func TestConn_CreateTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.Exec(s); err != nil {
+		if _, err := n.db.Exec(s); err != nil {
 			t.Fatal(err)
 		}
 	}

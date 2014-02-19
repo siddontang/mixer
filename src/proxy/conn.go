@@ -29,8 +29,9 @@ type conn struct {
 
 	connectionId uint32
 
-	status  uint16
-	charset byte
+	status    uint16
+	collation CollationId
+	charset   string
 
 	user string
 	db   string
@@ -39,7 +40,7 @@ type conn struct {
 
 	curSchema *schema
 
-	txs map[*node]*Tx
+	txConns map[*node]*Conn
 
 	stmtId uint32
 	stmts  map[uint32]*stmt
@@ -63,7 +64,7 @@ func newconn(s *Server, co net.Conn) *conn {
 
 	c.salt, _ = RandomBuf(20)
 
-	c.txs = make(map[*node]*Tx)
+	c.txConns = make(map[*node]*Conn)
 	c.stmts = make(map[uint32]*stmt)
 
 	c.closed = false
@@ -134,7 +135,7 @@ func (c *conn) writeInitialHandshake() error {
 	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	data = append(data, DEFAULT_UTF8_CHARSET)
+	data = append(data, uint8(DEFAULT_COLLATION_ID))
 
 	//status
 	data = append(data, byte(c.status), byte(c.status>>8))
@@ -175,7 +176,7 @@ func (c *conn) readHandshakeResponse() error {
 	pos += 4
 
 	//charset
-	c.charset = data[pos]
+	c.collation = CollationId(data[pos])
 	pos++
 
 	//skip reserved 23[00]

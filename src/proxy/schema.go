@@ -2,14 +2,17 @@ package proxy
 
 import (
 	"fmt"
+	. "parser"
 )
 
 type schema struct {
-	server   *Server
-	cfg      *config
-	db       string
-	nodes    []*node
-	rw_split bool
+	server *Server
+	cfg    *config
+	db     string
+	nodes  []*node
+
+	masterNodes []*node
+	slaveNodes  []*node
 }
 
 func newSchema(server *Server, cfgSchema *configSchema, nodes []*node) *schema {
@@ -19,7 +22,17 @@ func newSchema(server *Server, cfgSchema *configSchema, nodes []*node) *schema {
 	s.cfg = server.cfg
 	s.db = cfgSchema.DB
 	s.nodes = nodes
-	s.rw_split = cfgSchema.RWSplit
+
+	s.masterNodes = make([]*node, 0)
+	s.slaveNodes = make([]*node, 0)
+
+	for _, n := range nodes {
+		if n.Mode == MASTER_MODE {
+			s.masterNodes = append(s.masterNodes, n)
+		} else {
+			s.slaveNodes = append(s.slaveNodes, n)
+		}
+	}
 
 	return s
 }
@@ -30,17 +43,35 @@ type routeQuery struct {
 }
 
 //return a map key is node and value is the routeQuery the node will run
-func (s *schema) Route(l *lex) (map[*node]routeQuery, error) {
+func (s *schema) Route(l *lex, inTrans bool) (map[*node]routeQuery, error) {
 	//todo
 	//rebuild query for different node
-	//now we only return first datanode
 
-	return map[*node]routeQuery{s.nodes[0]: routeQuery{l.Query, l.Args}}, nil
+	//if in transaction, we will send all query to master nodes
+	if inTrans {
+		return s.routeNodes(l, s.masterNodes)
+	}
+
+	switch l.Get(0).Type {
+	case TK_SQL_SELECT:
+		//select may redirect to slave if slave exists
+		if len(s.slaveNodes) > 0 {
+			return s.routeNodes(l, s.slaveNodes)
+		} else {
+			return s.routeNodes(l, s.masterNodes)
+		}
+	default:
+		return s.routeNodes(l, s.masterNodes)
+	}
 }
 
-//return a node for prepare query
-func (s *schema) PrepareNode(l *lex) (*node, error) {
-	return s.nodes[0], nil
+func (s *schema) routeNodes(l *lex, ns []*node) (map[*node]routeQuery, error) {
+	if len(ns) == 0 {
+		return nil, fmt.Errorf("no proper node to route")
+	}
+
+	//now we only return first node
+	return map[*node]routeQuery{ns[0]: routeQuery{l.Query, l.Args}}, nil
 }
 
 type schemas map[string]*schema

@@ -22,6 +22,21 @@ func (s *stmt) ResetParams() {
 	s.l.Args = make([]interface{}, len(s.params))
 }
 
+func routePrepare(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
+	if len(args) > 0 {
+		return fmt.Errorf("prepare cannot have args")
+	}
+
+	r, err := co.Prepare(query)
+	if err != nil {
+		log.Error("node %s exec error %s", nodeName, err.Error())
+		return err
+	} else {
+		r.Close()
+		return [][]Field{r.Params, r.Columns}
+	}
+}
+
 func (c *conn) handleStmtPrepare(data []byte) error {
 	s := new(stmt)
 	query := string(data)
@@ -31,37 +46,54 @@ func (c *conn) handleStmtPrepare(data []byte) error {
 		return err
 	}
 
+	l.Prepared = true
 	s.l = l
 
-	if c.curSchema == nil {
-		return NewDefaultError(ER_NO_DB_ERROR)
-	}
-
-	n, err := c.curSchema.PrepareNode(l)
+	var results []interface{}
+	results, err = c.route(l, routePrepare)
 	if err != nil {
 		return err
 	}
 
-	var q dbQueryer
-
-	if q, err = c.getDBQueryer(n); err != nil {
-		return err
+LOOP:
+	for _, i := range results {
+		switch v := i.(type) {
+		case error:
+			err = v
+			break LOOP
+		case ([][]Field):
+			if len(v) != 2 {
+				err = fmt.Errorf("invalid prepare result %d", len(v))
+			}
+			//now we only use columns and params
+			s.params = v[0]
+			s.columns = v[1]
+		default:
+			err = fmt.Errorf("invalid return type %T", i)
+			break LOOP
+		}
 	}
 
-	var st *Stmt
-	//we try to prepare the query to check whether it's valid
-	if st, err = q.Prepare(query); err != nil {
+	if err != nil {
 		return err
 	}
-	s.columns = st.Columns
-	s.params = st.Params
-
-	st.Close()
 
 	s.id = c.stmtId
 	c.stmtId++
 
-	data = make([]byte, 4, 128)
+	if err = c.writePrepare(s); err != nil {
+		return err
+	}
+
+	s.ResetParams()
+
+	c.stmts[s.id] = s
+
+	return nil
+}
+
+func (c *conn) writePrepare(s *stmt) error {
+	data := make([]byte, 4, 128)
 
 	//status ok
 	data = append(data, 0)
@@ -83,7 +115,7 @@ func (c *conn) handleStmtPrepare(data []byte) error {
 	if len(s.params) > 0 {
 		for _, v := range s.params {
 			data = data[0:4]
-			data = append(data, v.Packet...)
+			data = append(data, v.Dump()...)
 			if err := c.WritePacket(data); err != nil {
 				return err
 			}
@@ -97,7 +129,7 @@ func (c *conn) handleStmtPrepare(data []byte) error {
 	if len(s.columns) > 0 {
 		for _, v := range s.columns {
 			data = data[0:4]
-			data = append(data, v.Packet...)
+			data = append(data, v.Dump()...)
 			if err := c.WritePacket(data); err != nil {
 				return err
 			}
@@ -108,11 +140,6 @@ func (c *conn) handleStmtPrepare(data []byte) error {
 		}
 
 	}
-
-	s.ResetParams()
-
-	c.stmts[s.id] = s
-
 	return nil
 }
 
