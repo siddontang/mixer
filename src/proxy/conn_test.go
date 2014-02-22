@@ -273,3 +273,93 @@ func TestConn_SetNames(t *testing.T) {
 		}
 	}
 }
+
+func TestConn_LastInsertId(t *testing.T) {
+	db := newTestDB()
+
+	c, err := db.GetConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	s := `CREATE TABLE IF NOT EXISTS mixer_test_conn_id (
+          id BIGINT(64) UNSIGNED AUTO_INCREMENT NOT NULL,
+          str VARCHAR(256),
+          PRIMARY KEY (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
+
+	server := newTestServer()
+	nodes := server.nodes
+	for _, n := range nodes {
+		if _, err := n.db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	r, err := c.Exec(`insert into mixer_test_conn_id (str) values ("abc")`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lastId := r.InsertId
+
+	if r, err := c.Query(`select last_insert_id();`); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetUint(0, 0); v != lastId {
+			t.Fatal(v)
+		}
+	}
+
+	if r, err := c.Query(`select last_insert_id() as a;`); err != nil {
+		t.Fatal(err)
+	} else {
+		if string(r.Fields[0].Name) != "a" {
+			t.Fatal(string(r.Fields[0].Name))
+		}
+
+		if v, _ := r.GetUint(0, 0); v != lastId {
+			t.Fatal(v)
+		}
+	}
+
+	for _, n := range nodes {
+		if _, err := n.db.Exec(`drop table if exists mixer_test_conn_id`); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestConn_RowCount(t *testing.T) {
+	db := newTestDB()
+
+	c, err := db.GetConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	r, err := c.Exec(`insert into mixer_test_proxy_conn (id, str) values (1002, "abc")`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	row := r.AffectedRows
+
+	if r, err := c.Query("select row_count();"); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetUint(0, 0); v != row {
+			t.Fatal(v)
+		}
+	}
+
+	if r, err := c.Query("select row_count() as b;"); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetInt(0, 0); v != -1 {
+			t.Fatal(v)
+		}
+	}
+}

@@ -46,6 +46,9 @@ type conn struct {
 	stmts  map[uint32]*stmt
 
 	closed bool
+
+	lastInsertId int64
+	affectedRows int64
 }
 
 var baseConnId uint32 = 10000

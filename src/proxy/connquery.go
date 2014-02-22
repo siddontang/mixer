@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"lib/log"
@@ -76,7 +75,8 @@ func (c *conn) handleQueryLiteral(l *lex) error {
 	case `ROLLBACK`:
 		return c.handleRollback()
 	default:
-		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("command %s not supported now", l.Get(0).Value))
+		return NewError(ER_UNKNOWN_ERROR,
+			fmt.Sprintf("command %s not supported now", l.Get(0).Value))
 	}
 }
 
@@ -221,121 +221,6 @@ LOOP:
 	return results, nil
 }
 
-func routeSelect(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
-	r, err := co.Query(query, args...)
-	if err != nil {
-		log.Error("node %s query error %s", nodeName, err.Error())
-		return err
-	} else {
-		return r
-	}
-}
-
-func mergeResultset(dest *Resultset, src *Resultset) error {
-	if dest.ColumnNumber() != src.ColumnNumber() {
-		return errors.New("column not match")
-	}
-
-	for i := range dest.Fields {
-		//here we test name, type and flag
-		if !bytes.Equal(dest.Fields[i].Name, src.Fields[i].Name) {
-			return fmt.Errorf("field name %s != %s", dest.Fields[i].Name, src.Fields[i].Name)
-		}
-
-		if dest.Fields[i].Type != src.Fields[i].Type {
-			return fmt.Errorf("field type %d != %d", dest.Fields[i].Type, src.Fields[i].Type)
-		}
-
-		if dest.Fields[i].Flag != src.Fields[i].Flag {
-			return fmt.Errorf("field flag %d != %d", dest.Fields[i].Flag, src.Fields[i].Flag)
-		}
-	}
-
-	dest.Status |= src.Status
-
-	//later we may merge with select condition like limit, order by, etc...
-	//now we only append row
-	for _, v := range src.RowPackets {
-		dest.RowPackets = append(dest.RowPackets, v)
-	}
-
-	return nil
-}
-
-func (c *conn) writeResultset(r *Resultset) error {
-	columnLen := PutLengthEncodedInt(uint64(len(r.Fields)))
-
-	data := make([]byte, 4, 1024)
-
-	data = append(data, columnLen...)
-	if err := c.WritePacket(data); err != nil {
-		return err
-	}
-
-	for _, v := range r.Fields {
-		data = data[0:4]
-		data = append(data, v.Dump()...)
-		if err := c.WritePacket(data); err != nil {
-			return err
-		}
-	}
-
-	if err := c.writeEOF(r.Status); err != nil {
-		return err
-	}
-
-	for _, v := range r.RowPackets {
-		data = data[0:4]
-		data = append(data, v...)
-		if err := c.WritePacket(data); err != nil {
-			return err
-		}
-	}
-
-	if err := c.writeEOF(r.Status); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *conn) handleSelect(l *lex) error {
-	results, err := c.route(l, routeSelect)
-	if err != nil {
-		return err
-	}
-
-	var r *Resultset = nil
-
-LOOP:
-	for _, i := range results {
-		switch v := i.(type) {
-		case error:
-			err = v
-			break LOOP
-		case *Resultset:
-			if r == nil {
-				r = v
-			} else {
-				if e := mergeResultset(r, v); err != nil {
-					err = e
-					break LOOP
-				}
-			}
-		default:
-			err = fmt.Errorf("invalid return type %T", i)
-			break LOOP
-		}
-	}
-
-	if err != nil {
-		return err
-	} else {
-		r.Status |= c.status
-		return c.writeResultset(r)
-	}
-}
-
 func routeExec(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
 	r, err := co.Exec(query, args...)
 	if err != nil {
@@ -352,6 +237,8 @@ func (c *conn) handleExec(l *lex) error {
 		return err
 	}
 
+	c.affectedRows = int64(-1)
+
 	var r = new(Result)
 	r.Status = c.status
 
@@ -364,7 +251,11 @@ LOOP:
 		case (*Result):
 			r.Status |= v.Status
 			r.AffectedRows += v.AffectedRows
-			if r.InsertId < v.InsertId {
+			if r.InsertId == 0 {
+				r.InsertId = v.InsertId
+			} else if r.InsertId > v.InsertId {
+				//last insert id is first gen id for multi row inserted
+				//see http://dev.mysql.com/doc/refman/5.6/en/information-functions.html#function_last-insert-id
 				r.InsertId = v.InsertId
 			}
 		default:
@@ -376,6 +267,12 @@ LOOP:
 	if err != nil {
 		return err
 	} else {
+		if r.InsertId > 0 {
+			c.lastInsertId = int64(r.InsertId)
+		}
+
+		c.affectedRows = int64(r.AffectedRows)
+
 		return c.writeOK(r)
 	}
 }
