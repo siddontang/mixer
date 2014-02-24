@@ -54,9 +54,27 @@ func (s *schema) Route(l *lex, inTrans bool) (map[*node]routeQuery, error) {
 
 	switch l.Get(0).Type {
 	case TK_SQL_SELECT:
-		//we will route all select @@var to master node
-		if l.Get(1).Type == TK_SYS_VARIABLE {
-			return s.routeNodes(l, s.masterNodes)
+		hasFrom := false
+		for _, t := range l.Tokens {
+			if t.Type == TK_SQL_FROM {
+				hasFrom = true
+				break
+			}
+		}
+
+		//if select have no from, we will route to master 0 or slave 0
+		if !hasFrom {
+			if len(s.masterNodes) > 0 {
+				return map[*node]routeQuery{
+					s.masterNodes[0]: routeQuery{l.Query, l.Args},
+				}, nil
+			} else if len(s.slaveNodes) > 0 {
+				return map[*node]routeQuery{
+					s.slaveNodes[0]: routeQuery{l.Query, l.Args},
+				}, nil
+			} else {
+				return nil, fmt.Errorf("no proper node to route")
+			}
 		}
 
 		//select may redirect to slave if slave exists
