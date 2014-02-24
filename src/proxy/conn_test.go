@@ -363,3 +363,21 @@ func TestConn_RowCount(t *testing.T) {
 		}
 	}
 }
+
+func TestConn_SelectVersion(t *testing.T) {
+	db := newTestDB()
+
+	c, err := db.GetConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if r, err := c.Query("select version();"); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetString(0, 0); v != ServerVersion {
+			t.Fatal(v)
+		}
+	}
+}

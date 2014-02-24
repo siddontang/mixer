@@ -372,7 +372,7 @@ func (c *conn) handleStmtSendLongData(data []byte) error {
 			b = append(b, data[6:]...)
 			s.l.Args[paramId] = b
 		} else {
-			return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("invalid param long data type %T", s.l.Args[paramId]))
+			return fmt.Errorf("invalid param long data type %T", s.l.Args[paramId])
 		}
 	}
 

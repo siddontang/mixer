@@ -191,7 +191,7 @@ func (c *conn) route(l *lex, f routeFunc) ([]interface{}, error) {
 	rs, err := c.curSchema.Route(l, c.needBeginTx())
 	if err != nil {
 		log.Error("schema route error %s", err.Error())
-		return nil, NewError(ER_UNKNOWN_ERROR, err.Error())
+		return nil, err
 	}
 
 	ch := make(chan interface{}, len(rs))

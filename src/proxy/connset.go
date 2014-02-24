@@ -15,7 +15,7 @@ func (c *conn) handleSet(l *lex) error {
 	case `NAMES`:
 		return c.handleSetNames(l)
 	default:
-		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("set %s can not supported now", l.Get(1).Value))
+		return fmt.Errorf("set %s can not supported now", l.Get(1).Value)
 	}
 }
 
@@ -34,7 +34,7 @@ func (c *conn) handleSetAutoCommit(l *lex) error {
 			}
 		}
 	} else {
-		return NewError(ER_UNKNOWN_ERROR, "set autocommit error")
+		return fmt.Errorf("set autocommit error")
 	}
 
 	return c.writeOK(nil)
