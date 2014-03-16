@@ -8,6 +8,8 @@ Mixer contains three key modules:
 - parser, builds mysql query ast, now only supports lexer.
 - proxy, an agent between mysql client and server, like mysql-proxy, atlas, cobar, etc...
 
+see [My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877) for more.
+
 ## mysql
 
 mysql provieds a simple interface for mysql use, very like golang database/sql but has a little different.
