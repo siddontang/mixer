@@ -3,10 +3,10 @@ package proxy
 import (
 	"encoding/binary"
 	"fmt"
-	"lib/log"
+	"github.com/siddontang/golib/log"
+	. "github.com/siddontang/mixer/go/mysql"
+	. "github.com/siddontang/mixer/go/parser"
 	"math"
-	. "mysql"
-	. "parser"
 	"strconv"
 )
 

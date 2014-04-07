@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"lib/log"
-	. "mysql"
-	. "parser"
+	"github.com/siddontang/golib/log"
+	. "github.com/siddontang/mixer/go/mysql"
+	. "github.com/siddontang/mixer/go/parser"
 	"strconv"
 	"strings"
 )

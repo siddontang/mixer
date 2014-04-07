@@ -3,8 +3,8 @@ package proxy
 import (
 	"container/list"
 	"fmt"
-	"lib/log"
-	. "mysql"
+	"github.com/siddontang/golib/log"
+	. "github.com/siddontang/mixer/go/mysql"
 	"strings"
 	"sync"
 	"time"

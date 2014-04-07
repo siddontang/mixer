@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	. "mysql"
+	. "github.com/siddontang/mixer/go/mysql"
 	"sync"
 	"testing"
 	"time"

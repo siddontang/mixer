@@ -2,8 +2,8 @@ package mysql
 
 import (
 	"fmt"
+	"github.com/siddontang/golib/log"
 	"io"
-	"lib/log"
 	"net"
 )
 

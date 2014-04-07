@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"fmt"
-	. "parser"
+	. "github.com/siddontang/mixer/go/parser"
 )
 
 type schema struct {

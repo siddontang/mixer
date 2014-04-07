@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"lib/log"
+	"github.com/siddontang/golib/log"
 	"net"
 	"runtime"
 )
@@ -26,9 +26,9 @@ func newServer(cfg *config) *Server {
 
 	s.cfg = cfg
 
-	s.addr = cfg.configServer.Addr
-	s.user = cfg.configServer.User
-	s.password = cfg.configServer.Password
+	s.addr = cfg.Addr
+	s.user = cfg.User
+	s.password = cfg.Password
 
 	s.nodes = newNodes(s)
 	s.schemas = newSchemas(s, s.nodes)

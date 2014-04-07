@@ -3,7 +3,7 @@ package mysql
 import (
 	"container/list"
 	"fmt"
-	"lib/log"
+	"github.com/siddontang/golib/log"
 	"strings"
 	"sync"
 )
