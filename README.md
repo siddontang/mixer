@@ -22,13 +22,14 @@ It aim to solve some mysql use problem in my company, which expects to support f
     make test
 
 
-
 # Todo....
 
 - supply custom rule to dispatch query to different mysql nodes. 
 - statistics. 
 
 # Feedback
+
+see [My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877) for more.
 
 now mixer is only simple and not perfect. I need your feedback to improve continually. Thank you very much!
 
