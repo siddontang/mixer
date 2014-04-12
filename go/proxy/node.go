@@ -40,16 +40,16 @@ func newNode(server *Server, cfgNode *configDataNode) (*node, error) {
 	n.server = server
 	n.cfg = server.cfg
 
-	if len(cfgNode.DSN) == 0 {
-		return nil, fmt.Errorf("no dsn set")
+	if len(cfgNode.Backends) == 0 {
+		return nil, fmt.Errorf("no backends set")
 	}
 
 	n.dbs = list.New()
 
 	var err error
 	var db *DB
-	for _, dsn := range cfgNode.DSN {
-		db, err = NewDB(dsn, cfgNode.MaxIdleConns)
+	for _, cfg := range cfgNode.Backends {
+		db, err = NewDB(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -79,12 +79,12 @@ func newNode(server *Server, cfgNode *configDataNode) (*node, error) {
 	return n, nil
 }
 
-func (n *node) GetConn() (*Conn, error) {
+func (n *node) GetConn() (*SqlConn, error) {
 	n.Lock()
 	db := n.db
 	n.Unlock()
 
-	return db.GetConn()
+	return NewSqlConn(db)
 }
 
 func (n *node) run() {
@@ -92,7 +92,7 @@ func (n *node) run() {
 	//1 check connection alive
 	//2 check remove mysql server alive
 
-	t := time.NewTicker(3 * time.Second)
+	t := time.NewTicker(3000 * time.Second)
 	defer t.Stop()
 
 	lastPing := time.Now().Unix()

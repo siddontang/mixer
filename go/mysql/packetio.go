@@ -1,53 +1,52 @@
 package mysql
 
 import (
+	"bufio"
 	"fmt"
-	"github.com/siddontang/golib/log"
 	"io"
 	"net"
 )
 
 type PacketIO struct {
-	Conn     net.Conn
+	rb *bufio.Reader
+	wb io.Writer
+
 	Sequence uint8
 }
 
-func (c *PacketIO) RemoteAddr() net.Addr {
-	return c.Conn.RemoteAddr()
+func NewPacketIO(conn net.Conn) *PacketIO {
+	p := new(PacketIO)
+
+	p.rb = bufio.NewReaderSize(conn, 1024)
+	p.wb = conn
+
+	p.Sequence = 0
+
+	return p
 }
 
-func (c *PacketIO) LocalAddr() net.Addr {
-	return c.Conn.LocalAddr()
-}
+func (p *PacketIO) ReadPacket() ([]byte, error) {
+	header := []byte{0, 0, 0, 0}
 
-func (c *PacketIO) ReadPacket() ([]byte, error) {
-	header := make([]byte, 4)
-
-	if _, err := io.ReadFull(c.Conn, header); err != nil {
-		log.Error("read header error %s", err.Error())
+	if _, err := io.ReadFull(p.rb, header); err != nil {
 		return nil, ErrBadConn
 	}
 
 	length := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
 	if length < 1 {
-		err := fmt.Errorf("invalid payload length %d", length)
-		log.Error(err.Error())
-		return nil, err
+		return nil, fmt.Errorf("invalid payload length %d", length)
 	}
 
 	sequence := uint8(header[3])
 
-	if sequence != c.Sequence {
-		err := fmt.Errorf("invalid sequence %d != %d", sequence, c.Sequence)
-		log.Error(err.Error())
-		return nil, err
+	if sequence != p.Sequence {
+		return nil, fmt.Errorf("invalid sequence %d != %d", sequence, p.Sequence)
 	}
 
-	c.Sequence++
+	p.Sequence++
 
 	data := make([]byte, length)
-	if _, err := io.ReadFull(c.Conn, data); err != nil {
-		log.Error("read payload data error %s", err.Error())
+	if _, err := io.ReadFull(p.rb, data); err != nil {
 		return nil, ErrBadConn
 	} else {
 		if length < MaxPayloadLen {
@@ -55,9 +54,8 @@ func (c *PacketIO) ReadPacket() ([]byte, error) {
 		}
 
 		var buf []byte
-		buf, err = c.ReadPacket()
+		buf, err = p.ReadPacket()
 		if err != nil {
-			log.Error("read packet error %s", err.Error())
 			return nil, ErrBadConn
 		} else {
 			return append(data, buf...), nil
@@ -66,7 +64,7 @@ func (c *PacketIO) ReadPacket() ([]byte, error) {
 }
 
 //data already have header
-func (c *PacketIO) WritePacket(data []byte) error {
+func (p *PacketIO) WritePacket(data []byte) error {
 	length := len(data) - 4
 
 	for length >= MaxPayloadLen {
@@ -75,16 +73,14 @@ func (c *PacketIO) WritePacket(data []byte) error {
 		data[1] = 0xff
 		data[2] = 0xff
 
-		data[3] = c.Sequence
+		data[3] = p.Sequence
 
-		if n, err := c.Conn.Write(data[:4+MaxPayloadLen]); err != nil {
-			log.Error("write error %s", err.Error())
+		if n, err := p.wb.Write(data[:4+MaxPayloadLen]); err != nil {
 			return ErrBadConn
 		} else if n != (4 + MaxPayloadLen) {
-			log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
 			return ErrBadConn
 		} else {
-			c.Sequence++
+			p.Sequence++
 			length -= MaxPayloadLen
 			data = data[MaxPayloadLen:]
 		}
@@ -93,16 +89,14 @@ func (c *PacketIO) WritePacket(data []byte) error {
 	data[0] = byte(length)
 	data[1] = byte(length >> 8)
 	data[2] = byte(length >> 16)
-	data[3] = c.Sequence
+	data[3] = p.Sequence
 
-	if n, err := c.Conn.Write(data); err != nil {
-		log.Error("write error %s", err.Error())
+	if n, err := p.wb.Write(data); err != nil {
 		return ErrBadConn
 	} else if n != len(data) {
-		log.Error("write error, write data number %d != %d", n, (4 + MaxPayloadLen))
 		return ErrBadConn
 	} else {
-		c.Sequence++
+		p.Sequence++
 		return nil
 	}
 }

@@ -6,11 +6,11 @@ import (
 )
 
 type configDataNode struct {
-	Name               string   `json:"name"`
-	DSN                []string `json:dsn`
-	Mode               string   `json:"mode"`
-	SwitchAfterNoAlive int      `json:"switch_after_noalive"`
-	MaxIdleConns       int      `json:"max_idle_conns"`
+	Name               string `json:"name"`
+	Mode               string `json:"mode"`
+	SwitchAfterNoAlive int    `json:"switch_after_noalive"`
+
+	Backends []json.RawMessage `json:"backends"`
 }
 
 type configSchema struct {
@@ -29,14 +29,18 @@ type config struct {
 }
 
 func newConfig(configFile string) (*config, error) {
-	c := new(config)
-
 	b, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(b, c)
+	return newConfigJson(b)
+}
+
+func newConfigJson(configJson json.RawMessage) (*config, error) {
+	c := new(config)
+
+	err := json.Unmarshal(configJson, c)
 	if err != nil {
 		return nil, err
 	}

@@ -15,23 +15,49 @@
         {
             "name" : "node1",
             "mode" : "master",
-            "dsn" : [
-                "qing:admin@127.0.0.1:3306/mixer",
-                "qing:admin@127.0.0.1:3306/mixer"
-            ],
+
             "_comment": "switch another db after N seconds when current's noalive",
             "switch_after_noalive": 300,
-            "max_idle_conns" : 16
+
+            "_comment" : "backends represent real mysql instance",
+            "backends" : [
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 16
+                },
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 16
+                }
+            ]
         },
         {
             "name" : "node2",
             "mode" : "slave",
-            "dsn" : [
-                "qing:admin@127.0.0.1:3306/mixer",
-                "qing:admin@127.0.0.1:3306/mixer"
-            ],
             "switch_after_noalive": 30,
-            "max_idle_conns" : 16
+
+            "backends" : [
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 16
+                },
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 16
+                }
+            ]
         }
     ],
 

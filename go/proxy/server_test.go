@@ -12,21 +12,59 @@ var testServer *Server
 var testDBOnce sync.Once
 var testDB *DB
 
+var configJson = []byte(`
+{
+    "addr" : "127.0.0.1:4000",
+    "user": "qing",
+    "password": "admin",
+
+    "nodes" : [
+        {
+            "name" : "node1",
+            "mode" : "master",
+            "switch_after_noalive": 300,
+            "backends" : [
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 32
+                }
+            ]
+        },
+        {
+            "name" : "node2",
+            "mode" : "slave",
+            "switch_after_noalive": 60,
+
+            "backends" : [
+                {
+                    "addr" : "127.0.0.1:3306",
+                    "user" : "qing",
+                    "password": "admin",
+                    "db" : "mixer",
+                    "idle_conns" : 32
+                }
+            ]
+        }
+    ],
+
+    "schemas" : [
+        {
+            "db" : "mixer",
+            "nodes" : ["node1", "node2"]
+        }
+    ]
+}
+	`)
+
 func newTestServer() *Server {
 	f := func() {
-		cfg := new(config)
-
-		cfg.Addr = "127.0.0.1:4000"
-		cfg.User = "qing"
-		cfg.Password = "admin"
-
-		cfg.Nodes = []configDataNode{
-			configDataNode{"node1", []string{"qing:admin@127.0.0.1:3306/mixer"}, "master", 300, 4},
-			configDataNode{"node2", []string{"qing:admin@127.0.0.1:3306/mixer"}, "slave", 60, 4},
-		}
-
-		cfg.Schemas = []configSchema{
-			configSchema{"mixer", []string{"node1", "node2"}},
+		cfg, err := newConfigJson(configJson)
+		if err != nil {
+			println(err.Error())
+			panic(err)
 		}
 
 		testServer = newServer(cfg)
@@ -45,11 +83,39 @@ func newTestDB() *DB {
 	newTestServer()
 
 	f := func() {
-		testDB, _ = NewDB("qing:admin@127.0.0.1:4000/mixer", 16)
+		var cfg = []byte(`
+			{
+			    "addr" : "127.0.0.1:4000",
+                "user" : "qing",
+                "password": "admin",
+                "db" : "mixer",
+                "idle_conns" : 4
+			}
+			`)
+		var err error
+		testDB, err = NewDB(cfg)
+
+		if err != nil {
+			println(err.Error())
+			panic(err)
+		}
 	}
 
 	testDBOnce.Do(f)
 	return testDB
+}
+
+func newTestDBConn() *SqlConn {
+	db := newTestDB()
+
+	c, err := NewSqlConn(db)
+
+	if err != nil {
+		println(err.Error())
+		panic(err)
+	}
+
+	return c
 }
 
 func TestServer(t *testing.T) {

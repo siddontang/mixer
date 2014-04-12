@@ -10,19 +10,30 @@ import (
 	"strconv"
 )
 
+var paramFieldData FieldData
+var columnFieldData FieldData
+
+func init() {
+	var p = &Field{Name: []byte("?")}
+	var c = &Field{}
+
+	paramFieldData = p.Dump()
+	columnFieldData = c.Dump()
+}
+
 type stmt struct {
 	id uint32
 	l  *lex
 
-	params  []Field
-	columns []Field
+	params  int
+	columns int
 }
 
 func (s *stmt) ResetParams() {
-	s.l.Args = make([]interface{}, len(s.params))
+	s.l.Args = make([]interface{}, s.params)
 }
 
-func routePrepare(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
+func routePrepare(nodeName string, co *SqlConn, query string, args ...interface{}) interface{} {
 	if len(args) > 0 {
 		return fmt.Errorf("prepare cannot have args")
 	}
@@ -33,7 +44,7 @@ func routePrepare(nodeName string, co *Conn, query string, args ...interface{}) 
 		return err
 	} else {
 		r.Close()
-		return [][]Field{r.Params, r.Columns}
+		return []int{r.ParamNum(), r.ColumnNum()}
 	}
 }
 
@@ -61,7 +72,7 @@ LOOP:
 		case error:
 			err = v
 			break LOOP
-		case ([][]Field):
+		case ([]int):
 			if len(v) != 2 {
 				err = fmt.Errorf("invalid prepare result %d", len(v))
 			}
@@ -100,23 +111,24 @@ func (c *conn) writePrepare(s *stmt) error {
 	//stmt id
 	data = append(data, Uint32ToBytes(s.id)...)
 	//number columns
-	data = append(data, Uint16ToBytes(uint16(len(s.columns)))...)
+	data = append(data, Uint16ToBytes(uint16(s.columns))...)
 	//number params
-	data = append(data, Uint16ToBytes(uint16(len(s.params)))...)
+	data = append(data, Uint16ToBytes(uint16(s.params))...)
 	//filter [00]
 	data = append(data, 0)
 	//warning count
 	data = append(data, 0, 0)
 
-	if err := c.WritePacket(data); err != nil {
+	if err := c.writePacket(data); err != nil {
 		return err
 	}
 
-	if len(s.params) > 0 {
-		for _, v := range s.params {
+	if s.params > 0 {
+		for i := 0; i < s.params; i++ {
 			data = data[0:4]
-			data = append(data, v.Dump()...)
-			if err := c.WritePacket(data); err != nil {
+			data = append(data, []byte(paramFieldData)...)
+
+			if err := c.writePacket(data); err != nil {
 				return err
 			}
 		}
@@ -126,11 +138,12 @@ func (c *conn) writePrepare(s *stmt) error {
 		}
 	}
 
-	if len(s.columns) > 0 {
-		for _, v := range s.columns {
+	if s.columns > 0 {
+		for i := 0; i < s.columns; i++ {
 			data = data[0:4]
-			data = append(data, v.Dump()...)
-			if err := c.WritePacket(data); err != nil {
+			data = append(data, []byte(columnFieldData)...)
+
+			if err := c.writePacket(data); err != nil {
 				return err
 			}
 		}
@@ -172,10 +185,10 @@ func (c *conn) handleStmtExecute(data []byte) error {
 	var paramTypes []byte
 	var paramValues []byte
 
-	paramNum := len(s.params)
+	paramNum := s.params
 
 	if paramNum > 0 {
-		nullBitmapLen := (len(s.params) + 7) >> 3
+		nullBitmapLen := (s.params + 7) >> 3
 		if len(data) < (pos + nullBitmapLen + 1) {
 			return ErrMalformPacket
 		}
@@ -232,7 +245,7 @@ func (c *conn) bindStmtArgs(s *stmt, nullBitmap, paramTypes, paramValues []byte)
 	var isNull bool
 	var err error
 
-	for i := 0; i < len(s.params); i++ {
+	for i := 0; i < s.params; i++ {
 		if nullBitmap[i>>3]&(1<<(uint(i)%8)) > 0 {
 			args[i] = nil
 			continue
@@ -361,7 +374,7 @@ func (c *conn) handleStmtSendLongData(data []byte) error {
 	}
 
 	paramId := binary.LittleEndian.Uint16(data[4:6])
-	if paramId >= uint16(len(s.params)) {
+	if paramId >= uint16(s.params) {
 		return NewDefaultError(ER_WRONG_ARGUMENTS, "stmt_send_longdata")
 	}
 

@@ -12,19 +12,19 @@ var (
 	ErrTxDone = errors.New("sql: Transaction has already been committed or rolled back")
 )
 
-type MySQLError struct {
+type SqlError struct {
 	Code    uint16
 	Message string
 	State   string
 }
 
-func (e *MySQLError) Error() string {
+func (e *SqlError) Error() string {
 	return fmt.Sprintf("ERROR %d (%s): %s", e.Code, e.State, e.Message)
 }
 
 //default mysql error, must adapt errname message format
-func NewDefaultError(errCode uint16, args ...interface{}) *MySQLError {
-	e := new(MySQLError)
+func NewDefaultError(errCode uint16, args ...interface{}) *SqlError {
+	e := new(SqlError)
 	e.Code = errCode
 
 	if s, ok := MySQLState[errCode]; ok {
@@ -42,8 +42,8 @@ func NewDefaultError(errCode uint16, args ...interface{}) *MySQLError {
 	return e
 }
 
-func NewError(errCode uint16, message string) *MySQLError {
-	e := new(MySQLError)
+func NewError(errCode uint16, message string) *SqlError {
+	e := new(SqlError)
 	e.Code = errCode
 
 	if s, ok := MySQLState[errCode]; ok {

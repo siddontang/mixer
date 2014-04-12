@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/siddontang/golib/log"
@@ -21,14 +20,14 @@ func (c *conn) writeResultset(r *Resultset) error {
 	data := make([]byte, 4, 1024)
 
 	data = append(data, columnLen...)
-	if err := c.WritePacket(data); err != nil {
+	if err := c.writePacket(data); err != nil {
 		return err
 	}
 
 	for _, v := range r.Fields {
 		data = data[0:4]
 		data = append(data, v.Dump()...)
-		if err := c.WritePacket(data); err != nil {
+		if err := c.writePacket(data); err != nil {
 			return err
 		}
 	}
@@ -37,10 +36,10 @@ func (c *conn) writeResultset(r *Resultset) error {
 		return err
 	}
 
-	for _, v := range r.RowPackets {
+	for _, v := range r.RowDatas {
 		data = data[0:4]
 		data = append(data, v...)
-		if err := c.WritePacket(data); err != nil {
+		if err := c.writePacket(data); err != nil {
 			return err
 		}
 	}
@@ -109,7 +108,7 @@ func (c *conn) selectInfoFunc(l *lex, value interface{}) (*Resultset, error) {
 
 	r := new(Resultset)
 
-	field := Field{}
+	field := &Field{}
 
 	field.Name = []byte(name)
 	field.OrgName = []byte(l.Get(1).Value)
@@ -135,15 +134,15 @@ func (c *conn) selectInfoFunc(l *lex, value interface{}) (*Resultset, error) {
 		return nil, fmt.Errorf("unsupport type %T for resultset", value)
 	}
 
-	r.Fields = []Field{field}
+	r.Fields = []*Field{field}
 
-	r.RowPackets = append(r.RowPackets,
+	r.RowDatas = append(r.RowDatas,
 		PutLengthEncodedString([]byte(row)))
 
 	return r, nil
 }
 
-func routeSelect(nodeName string, co *Conn, query string, args ...interface{}) interface{} {
+func routeSelect(nodeName string, co *SqlConn, query string, args ...interface{}) interface{} {
 	r, err := co.Query(query, args...)
 	if err != nil {
 		log.Error("node %s query error %s", nodeName, err.Error())
@@ -158,27 +157,12 @@ func mergeResultset(dest *Resultset, src *Resultset) error {
 		return errors.New("column not match")
 	}
 
-	for i := range dest.Fields {
-		//here we test name, type and flag
-		if !bytes.Equal(dest.Fields[i].Name, src.Fields[i].Name) {
-			return fmt.Errorf("field name %s != %s", dest.Fields[i].Name, src.Fields[i].Name)
-		}
-
-		if dest.Fields[i].Type != src.Fields[i].Type {
-			return fmt.Errorf("field type %d != %d", dest.Fields[i].Type, src.Fields[i].Type)
-		}
-
-		if dest.Fields[i].Flag != src.Fields[i].Flag {
-			return fmt.Errorf("field flag %d != %d", dest.Fields[i].Flag, src.Fields[i].Flag)
-		}
-	}
-
 	dest.Status |= src.Status
 
 	//later we may merge with select condition like limit, order by, etc...
 	//now we only append row
-	for _, v := range src.RowPackets {
-		dest.RowPackets = append(dest.RowPackets, v)
+	for _, v := range src.RowDatas {
+		dest.RowDatas = append(dest.RowDatas, v)
 	}
 
 	return nil

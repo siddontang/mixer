@@ -104,8 +104,8 @@ func TestStmt_Select(t *testing.T) {
 	if result, err := s.Query(1); err != nil {
 		t.Fatal(err)
 	} else {
-		if len(result.Data) != 1 {
-			t.Fatal(len(result.Data))
+		if len(result.Values) != 1 {
+			t.Fatal(len(result.Values))
 		}
 
 		if len(result.Fields) != 3 {

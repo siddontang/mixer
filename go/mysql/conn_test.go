@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func newTestConn() *conn {
-	c := new(conn)
+func newTestConn() *Conn {
+	c := new(Conn)
 
 	if err := c.Connect("127.0.0.1:3306", "qing", "admin", "mixer"); err != nil {
 		panic(err)
@@ -85,8 +85,8 @@ func TestConn_Select(t *testing.T) {
 			t.Fatal(len(result.Fields))
 		}
 
-		if len(result.Data) != 1 {
-			t.Fatal(len(result.Data))
+		if len(result.Values) != 1 {
+			t.Fatal(len(result.Values))
 		}
 
 		if str, _ := result.GetString(0, 0); str != "a" {
@@ -120,15 +120,20 @@ func TestConn_FieldList(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if result, err := c.FieldList("mixer_test_conn", "st%"); err != nil {
+	if r, err := c.FieldList("mixer_test_conn", "st%"); err != nil {
 		t.Fatal(err)
 	} else {
-		if len(result) != 1 {
-			t.Fatal(len(result))
+		if len(r) != 1 {
+			t.Fatal(len(r))
 		}
 
-		if string(result[0].Name) != `str` {
-			t.Fatal(string(result[0].Name))
+		result, err := r[0].Parse()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if string(result.Name) != `str` {
+			t.Fatal(string(result.Name))
 		}
 	}
 }

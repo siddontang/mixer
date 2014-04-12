@@ -6,8 +6,15 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"runtime"
 	"unicode/utf8"
 )
+
+func Pstack() string {
+	buf := make([]byte, 1024)
+	n := runtime.Stack(buf, false)
+	return string(buf[0:n])
+}
 
 func CalcPassword(scramble, password []byte) []byte {
 	if len(password) == 0 {

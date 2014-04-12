@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	. "github.com/siddontang/mixer/go/mysql"
 	"testing"
 )
 
@@ -9,7 +8,10 @@ func TestStmt_DropTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.db.Exec(`drop table if exists mixer_test_proxy_stmt`); err != nil {
+		c, _ := n.GetConn()
+		defer c.Close()
+
+		if _, err := c.Exec(`drop table if exists mixer_test_proxy_stmt`); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -29,7 +31,10 @@ func TestStmt_CreateTable(t *testing.T) {
 	server := newTestServer()
 	nodes := server.nodes
 	for _, n := range nodes {
-		if _, err := n.db.Exec(str); err != nil {
+		c, _ := n.GetConn()
+		defer c.Close()
+
+		if _, err := c.Exec(str); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -38,9 +43,10 @@ func TestStmt_CreateTable(t *testing.T) {
 func TestStmt_Delete(t *testing.T) {
 	str := `delete from mixer_test_proxy_stmt`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -56,9 +62,10 @@ func TestStmt_Delete(t *testing.T) {
 func TestStmt_Insert(t *testing.T) {
 	str := `insert into mixer_test_proxy_stmt (id, str, f, e, u, i) values (?, ?, ?, ?, ?, ?)`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -78,9 +85,10 @@ func TestStmt_Insert(t *testing.T) {
 func TestStmt_Select(t *testing.T) {
 	str := `select str, f, e from mixer_test_proxy_stmt where id = ?`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -89,8 +97,8 @@ func TestStmt_Select(t *testing.T) {
 	if result, err := s.Query(1); err != nil {
 		t.Fatal(err)
 	} else {
-		if len(result.Data) != 1 {
-			t.Fatal(len(result.Data))
+		if len(result.Values) != 1 {
+			t.Fatal(len(result.Values))
 		}
 
 		if len(result.Fields) != 3 {
@@ -129,9 +137,10 @@ func TestStmt_Select(t *testing.T) {
 func TestStmt_NULL(t *testing.T) {
 	str := `insert into mixer_test_proxy_stmt (id, str, f, e) values (?, ?, ?, ?)`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +157,7 @@ func TestStmt_NULL(t *testing.T) {
 	s.Close()
 
 	str = `select * from mixer_test_proxy_stmt where id = ?`
-	s, err = db.Prepare(str)
+	s, err = c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -188,9 +197,10 @@ func TestStmt_NULL(t *testing.T) {
 func TestStmt_Unsigned(t *testing.T) {
 	str := `insert into mixer_test_proxy_stmt (id, u) values (?, ?)`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -208,7 +218,7 @@ func TestStmt_Unsigned(t *testing.T) {
 
 	str = `select u from mixer_test_proxy_stmt where id = ?`
 
-	s, err = db.Prepare(str)
+	s, err = c.Prepare(str)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,9 +239,10 @@ func TestStmt_Unsigned(t *testing.T) {
 func TestStmt_Signed(t *testing.T) {
 	str := `insert into mixer_test_proxy_stmt (id, i) values (?, ?)`
 
-	db := newTestDB()
+	c := newTestDBConn()
+	defer c.Close()
 
-	s, err := db.Prepare(str)
+	s, err := c.Prepare(str)
 
 	if err != nil {
 		t.Fatal(err)
@@ -250,21 +261,21 @@ func TestStmt_Signed(t *testing.T) {
 }
 
 func TestStmt_Trans(t *testing.T) {
-	db := newTestDB()
+	c1 := newTestDBConn()
+	defer c1.Close()
 
-	if _, err := db.Exec(`insert into mixer_test_proxy_stmt (id, str) values (1002, "abc")`); err != nil {
+	if _, err := c1.Exec(`insert into mixer_test_proxy_stmt (id, str) values (1002, "abc")`); err != nil {
 		t.Fatal(err)
 	}
 
-	var tx *Tx
 	var err error
-	if tx, err = db.Begin(); err != nil {
+	if err = c1.Begin(); err != nil {
 		t.Fatal(err)
 	}
 
 	str := `select str from mixer_test_proxy_stmt where id = ?`
 
-	s, err := tx.Prepare(str)
+	s, err := c1.Prepare(str)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +284,7 @@ func TestStmt_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := c1.Commit(); err != nil {
 		t.Fatal(err)
 	}
 

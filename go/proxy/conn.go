@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/siddontang/golib/log"
 	. "github.com/siddontang/mixer/go/mysql"
-	"io"
 	"net"
 	"runtime"
 	"sync"
@@ -19,7 +18,9 @@ var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG |
 
 //client <-> proxy
 type conn struct {
-	PacketIO
+	pkg *PacketIO
+
+	c net.Conn
 
 	sync.Mutex
 
@@ -40,7 +41,7 @@ type conn struct {
 
 	curSchema *schema
 
-	txConns map[*node]*Conn
+	txConns map[*node]*SqlConn
 
 	stmtId uint32
 	stmts  map[uint32]*stmt
@@ -56,10 +57,14 @@ var baseConnId uint32 = 10000
 func newconn(s *Server, co net.Conn) *conn {
 	c := new(conn)
 
+	c.c = co
+
+	c.pkg = NewPacketIO(co)
+
 	c.server = s
 
-	c.Conn = co
-	c.Sequence = 0
+	c.c = co
+	c.pkg.Sequence = 0
 
 	c.connectionId = atomic.AddUint32(&baseConnId, 1)
 
@@ -67,7 +72,7 @@ func newconn(s *Server, co net.Conn) *conn {
 
 	c.salt, _ = RandomBuf(20)
 
-	c.txConns = make(map[*node]*Conn)
+	c.txConns = make(map[*node]*SqlConn)
 	c.stmts = make(map[uint32]*stmt)
 
 	c.closed = false
@@ -99,7 +104,7 @@ func (c *conn) Handshake() error {
 		return err
 	}
 
-	c.Sequence = 0
+	c.pkg.Sequence = 0
 
 	return nil
 }
@@ -109,7 +114,7 @@ func (c *conn) Close() error {
 		return nil
 	}
 
-	c.Conn.Close()
+	c.c.Close()
 
 	c.rollback()
 
@@ -162,11 +167,19 @@ func (c *conn) writeInitialHandshake() error {
 	//filter [00]
 	data = append(data, 0)
 
-	return c.WritePacket(data)
+	return c.writePacket(data)
+}
+
+func (c *conn) readPacket() ([]byte, error) {
+	return c.pkg.ReadPacket()
+}
+
+func (c *conn) writePacket(data []byte) error {
+	return c.pkg.WritePacket(data)
 }
 
 func (c *conn) readHandshakeResponse() error {
-	data, err := c.ReadPacket()
+	data, err := c.readPacket()
 
 	if err != nil {
 		return err
@@ -200,7 +213,7 @@ func (c *conn) readHandshakeResponse() error {
 	checkAuth := CalcPassword(c.salt, []byte(c.server.cfg.Password))
 
 	if !bytes.Equal(auth, checkAuth) {
-		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.RemoteAddr().String(), c.user)
+		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.c.RemoteAddr().String(), c.user)
 	}
 
 	pos += authLen
@@ -232,12 +245,9 @@ func (c *conn) Run() {
 	}()
 
 	for {
-		data, err := c.ReadPacket()
+		data, err := c.readPacket()
 
 		if err != nil {
-			if err != io.EOF {
-				log.Error("read packet error %s, close", err.Error())
-			}
 			return
 		}
 
@@ -248,7 +258,7 @@ func (c *conn) Run() {
 			}
 		}
 
-		c.Sequence = 0
+		c.pkg.Sequence = 0
 	}
 }
 
@@ -307,13 +317,13 @@ func (c *conn) writeOK(r *Result) error {
 		data = append(data, 0, 0)
 	}
 
-	return c.WritePacket(data)
+	return c.writePacket(data)
 }
 
 func (c *conn) writeError(e error) error {
-	var m *MySQLError
+	var m *SqlError
 	var ok bool
-	if m, ok = e.(*MySQLError); !ok {
+	if m, ok = e.(*SqlError); !ok {
 		m = NewError(ER_UNKNOWN_ERROR, e.Error())
 	}
 
@@ -329,7 +339,7 @@ func (c *conn) writeError(e error) error {
 
 	data = append(data, m.Message...)
 
-	return c.WritePacket(data)
+	return c.writePacket(data)
 }
 
 func (c *conn) writeEOF(status uint16) error {
@@ -341,5 +351,5 @@ func (c *conn) writeEOF(status uint16) error {
 		data = append(data, byte(status), byte(status)>>8)
 	}
 
-	return c.WritePacket(data)
+	return c.writePacket(data)
 }
