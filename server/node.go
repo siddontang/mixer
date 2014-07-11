@@ -1,10 +1,10 @@
-package proxy
+package server
 
 import (
 	"container/list"
 	"fmt"
-	"github.com/siddontang/golib/log"
-	. "github.com/siddontang/mixer/go/mysql"
+	"github.com/siddontang/go-log/log"
+	. "github.com/siddontang/mixer/mysql"
 	"strings"
 	"sync"
 	"time"

@@ -1,8 +1,8 @@
-package proxy
+package server
 
 import (
 	"fmt"
-	. "github.com/siddontang/mixer/go/parser"
+	. "github.com/siddontang/mixer/parser"
 )
 
 type schema struct {

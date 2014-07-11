@@ -1,11 +1,11 @@
-package proxy
+package server
 
 import (
 	"errors"
 	"fmt"
-	"github.com/siddontang/golib/log"
-	. "github.com/siddontang/mixer/go/mysql"
-	. "github.com/siddontang/mixer/go/parser"
+	"github.com/siddontang/go-log/log"
+	. "github.com/siddontang/mixer/mysql"
+	. "github.com/siddontang/mixer/parser"
 	"strconv"
 	"strings"
 )

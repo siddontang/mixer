@@ -1,7 +1,7 @@
-package proxy
+package server
 
 import (
-	. "github.com/siddontang/mixer/go/mysql"
+	. "github.com/siddontang/mixer/mysql"
 	"testing"
 )
 

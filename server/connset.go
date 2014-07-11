@@ -1,9 +1,9 @@
-package proxy
+package server
 
 import (
 	"fmt"
-	. "github.com/siddontang/mixer/go/mysql"
-	. "github.com/siddontang/mixer/go/parser"
+	. "github.com/siddontang/mixer/mysql"
+	. "github.com/siddontang/mixer/parser"
 	"strconv"
 	"strings"
 )

@@ -1,11 +1,11 @@
-package proxy
+package server
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/siddontang/golib/log"
-	. "github.com/siddontang/mixer/go/mysql"
+	"github.com/siddontang/go-log/log"
+	. "github.com/siddontang/mixer/mysql"
 	"net"
 	"runtime"
 	"sync"

@@ -7,4 +7,4 @@ fi
 
 source ./dev.env
 
-go get github.com/siddontang/golib/log
+go get -u github.com/siddontang/go-log/log

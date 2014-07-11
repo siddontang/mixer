@@ -1,7 +1,7 @@
-package proxy
+package server
 
 import (
-	"github.com/siddontang/golib/log"
+	"github.com/siddontang/go-log/log"
 	"net"
 	"runtime"
 )
