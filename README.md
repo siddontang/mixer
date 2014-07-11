@@ -1,13 +1,19 @@
 # Mixer
 
-Mixer is not only a mysql proxy, its aim to supply a simple solution for mysql use.
+Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using MySQL.
 
-It aim to solve some mysql use problem in my company, which expects to support following feature:
+## Featrues
 
-- split read and write.
-- mysql node HA, if main node crashed, switch to backup node automatically.
+- Supports base MySQL 
+- Splits read and write.
+- MySQL HA, switchs backup automatically if main crashed
 
-# Install 
+## Todo
+
+- Routes SQL to multi MySQL server with specified rule.
+- Statistics.
+
+## Install 
 
     cd $WORKSPACE
     git clone git@github.com:siddontang/mixer.git src/github.com/siddontang/mixer
@@ -21,19 +27,16 @@ It aim to solve some mysql use problem in my company, which expects to support f
     make
     make test
 
+## Usage
 
-# Todo....
+Add later......
+ 
+## Doc
 
-- supply custom rule to dispatch query to different mysql nodes. 
-- statistics. 
+[My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877)
 
-# Feedback
-
-see [My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877) for more.
-
-now mixer is only simple and not perfect. I need your feedback to improve continually. Thank you very much!
+## Feedback
 
 Email: siddontang@gmail.com
 
-QQ: 335498184
 
