@@ -1,22 +1,38 @@
 package sqlparser
 
+type Buffer interface {
+	Write([]byte) (n, error)
+	WriteString(string) (n, error)
+}
+
+type Formater interface {
+	Format(b Buffer)
+}
+
+// Node represents basic type literal
 type Node struct {
+	Type  int
+	Value string
 }
 
-func (n *Node) Format(b *Buffer) {
-
+func (n *Node) Format(b Buffer) {
+	b.WriteString(n.Value)
 }
 
-type Statement interface {
-	statement()
-	Format(*Buffer)
+func NewNode(tp int, value string) *Node {
+	return &Node{tp, value}
 }
 
-type Select struct {
+type ParseError string
+
+func (p ParseError) Error() string {
+	return string(p)
 }
 
-func (s *Select) statement() {}
-
-func (s *Select) Format(b *Buffer) {
-
+func Parse(sql string) (Statement, error) {
+	l := NewStringTokenizer(sql)
+	if yyParse(l) != 0 {
+		return nil, ParseError(l.LastError)
+	}
+	return l.ParseTree, nil
 }

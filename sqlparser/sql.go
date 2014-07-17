@@ -4,26 +4,189 @@ package sqlparser
 import __yyfmt__ "fmt"
 
 //line sql.y:2
-func SetParseTree(l interface{}, stmt Statement) {
-	lexer := l.(*Lexer)
-	lexer.ParseTree = stmt
+func SetParseTree(yylex interface{}, stmt Statement) {
+	tn := yylex.(*Tokenizer)
+	tn.ParseTree = stmt
 }
 
-//line sql.y:10
+func SetAllowComments(yylex interface{}, allow bool) {
+	tn := yylex.(*Tokenizer)
+	tn.AllowComments = allow
+}
+
+func ForceEOF(yylex interface{}) {
+	tn := yylex.(*Tokenizer)
+	tn.ForceEOF = true
+}
+
+//line sql.y:21
 type yySymType struct {
-	yys       int
-	node      *Node
-	statement Statement
+	yys  int
+	node *Node
+	stmt Stmt
+	expr Expr
+	num  int
 }
 
 const SELECT = 57346
-const command = 57347
-const select_statement = 57348
+const INSERT = 57347
+const UPDATE = 57348
+const DELETE = 57349
+const REPLACE = 57350
+const FROM = 57351
+const WHERE = 57352
+const GROUP = 57353
+const HAVING = 57354
+const ORDER = 57355
+const BY = 57356
+const LIMIT = 57357
+const COMMENT = 57358
+const FOR = 57359
+const ALL = 57360
+const DISTINCT = 57361
+const AS = 57362
+const EXISTS = 57363
+const IN = 57364
+const IS = 57365
+const LIKE = 57366
+const BETWEEN = 57367
+const NULL = 57368
+const ASC = 57369
+const DESC = 57370
+const VALUES = 57371
+const INTO = 57372
+const DUPLICATE = 57373
+const KEY = 57374
+const DEFAULT = 57375
+const SET = 57376
+const LOCK = 57377
+const BEGIN = 57378
+const COMMIT = 57379
+const ROLLBACK = 57380
+const ID = 57381
+const STRING = 57382
+const NUMBER = 57383
+const NAME = 57384
+const LE = 57385
+const GE = 57386
+const NE = 57387
+const NULL_SAFE_EQUAL = 57388
+const LEX_ERROR = 57389
+const LOW_PRIORITY = 57390
+const QUICK = 57391
+const IGNORE = 57392
+const UNION = 57393
+const MINUS = 57394
+const EXCEPT = 57395
+const INTERSECT = 57396
+const JOIN = 57397
+const STRAIGHT_JOIN = 57398
+const LEFT = 57399
+const RIGHT = 57400
+const INNER = 57401
+const OUTER = 57402
+const CROSS = 57403
+const NATURAL = 57404
+const USE = 57405
+const FORCE = 57406
+const ON = 57407
+const AND = 57408
+const OR = 57409
+const NOT = 57410
+const UNARY = 57411
+const CASE = 57412
+const WHEN = 57413
+const THEN = 57414
+const ELSE = 57415
+const END = 57416
 
 var yyToknames = []string{
 	"SELECT",
-	"command",
-	"select_statement",
+	"INSERT",
+	"UPDATE",
+	"DELETE",
+	"REPLACE",
+	"FROM",
+	"WHERE",
+	"GROUP",
+	"HAVING",
+	"ORDER",
+	"BY",
+	"LIMIT",
+	"COMMENT",
+	"FOR",
+	"ALL",
+	"DISTINCT",
+	"AS",
+	"EXISTS",
+	"IN",
+	"IS",
+	"LIKE",
+	"BETWEEN",
+	"NULL",
+	"ASC",
+	"DESC",
+	"VALUES",
+	"INTO",
+	"DUPLICATE",
+	"KEY",
+	"DEFAULT",
+	"SET",
+	"LOCK",
+	"BEGIN",
+	"COMMIT",
+	"ROLLBACK",
+	"ID",
+	"STRING",
+	"NUMBER",
+	"NAME",
+	"LE",
+	"GE",
+	"NE",
+	"NULL_SAFE_EQUAL",
+	"LEX_ERROR",
+	" (",
+	" =",
+	" <",
+	" >",
+	" ~",
+	"LOW_PRIORITY",
+	"QUICK",
+	"IGNORE",
+	"UNION",
+	"MINUS",
+	"EXCEPT",
+	"INTERSECT",
+	" ,",
+	"JOIN",
+	"STRAIGHT_JOIN",
+	"LEFT",
+	"RIGHT",
+	"INNER",
+	"OUTER",
+	"CROSS",
+	"NATURAL",
+	"USE",
+	"FORCE",
+	"ON",
+	"AND",
+	"OR",
+	"NOT",
+	" &",
+	" |",
+	" ^",
+	" +",
+	" -",
+	" *",
+	" /",
+	" %",
+	" .",
+	"UNARY",
+	"CASE",
+	"WHEN",
+	"THEN",
+	"ELSE",
+	"END",
 }
 var yyStatenames = []string{}
 
@@ -38,49 +201,77 @@ var yyExca = []int{
 	-2, 0,
 }
 
-const yyNprod = 3
+const yyNprod = 18
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 4
+const yyLast = 47
 
 var yyAct = []int{
 
-	4, 2, 3, 1,
+	15, 19, 9, 12, 10, 11, 13, 14, 8, 7,
+	6, 5, 4, 3, 2, 1, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 16, 17, 18,
 }
 var yyPact = []int{
 
-	-4, -1000, -1000, -5, -1000,
+	-2, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
+	-1000, -1000, -1000, -1000, -9, -41, -1000, -1000, -1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 3, 2,
+	0, 15, 14, 13, 12, 11, 10, 9, 8, 7,
 }
 var yyR1 = []int{
 
-	0, 2, 1,
+	0, 1, 2, 2, 2, 2, 2, 2, 3, 4,
+	5, 6, 7, 8, 9, 9, 9, 9,
 }
 var yyR2 = []int{
 
-	0, 0, 3,
+	0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+	4, 1, 1, 0, 2, 2, 2, 0,
 }
 var yyChk = []int{
 
-	-1000, -1, 5, -2, 5,
+	-1000, -1, -2, -3, -4, -5, -6, -7, -8, 4,
+	6, 7, 5, 8, -9, 9, 53, 54, 55, 42,
 }
 var yyDef = []int{
 
-	0, -2, 1, 0, 2,
+	13, -2, 1, 2, 3, 4, 5, 6, 7, 8,
+	9, 17, 11, 12, 0, 0, 14, 15, 16, 10,
 }
 var yyTok1 = []int{
 
-	1,
+	1, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 82, 75, 3,
+	48, 3, 80, 78, 60, 79, 83, 81, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	50, 49, 51, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 77, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 76, 3, 52,
 }
 var yyTok2 = []int{
 
-	2, 3, 4, 5, 6,
+	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+	22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+	32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+	42, 43, 44, 45, 46, 47, 53, 54, 55, 56,
+	57, 58, 59, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 73, 74, 84, 85, 86,
+	87, 88, 89,
 }
 var yyTok3 = []int{
 	0,
@@ -312,9 +503,71 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line sql.y:25
+		//line sql.y:65
 		{
-			SetParseTree(yylex, yyS[yypt-0].statement)
+			SetParseTree(yylex, yyS[yypt-0].stmt)
+		}
+	case 2:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 3:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 4:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 5:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 6:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 7:
+		yyVAL.stmt = yyS[yypt-0].stmt
+	case 8:
+		//line sql.y:79
+		{
+
+		}
+	case 9:
+		//line sql.y:85
+		{
+
+		}
+	case 10:
+		//line sql.y:91
+		{
+			yyVAL.stmt = &DeleteStmt{Opts: yyS[yypt-2].num, Table: yyS[yypt-0].node}
+		}
+	case 11:
+		//line sql.y:97
+		{
+
+		}
+	case 12:
+		//line sql.y:103
+		{
+
+		}
+	case 13:
+		//line sql.y:108
+		{
+
+		}
+	case 14:
+		//line sql.y:115
+		{
+			yyVAL.num = yyS[yypt-1].num | 1
+		}
+	case 15:
+		//line sql.y:119
+		{
+			yyVAL.num = yyS[yypt-1].num | 2
+		}
+	case 16:
+		//line sql.y:123
+		{
+			yyVAL.num = yyS[yypt-1].num | 4
+		}
+	case 17:
+		//line sql.y:126
+		{
+			yyVAL.num = 0
 		}
 	}
 	goto yystack /* stack new state and value */
