@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+
+	"github.com/siddontang/mixer/sqltypes"
 )
 
 const EOFCHAR = 0x100
@@ -87,17 +89,18 @@ var keywords = map[string]int{
 	"set":       SET,
 	"lock":      LOCK,
 
+	"create": CREATE,
+	"alter":  ALTER,
+	"rename": RENAME,
+	"drop":   DROP,
 	"table":  TABLE,
 	"index":  INDEX,
+	"view":   VIEW,
 	"to":     TO,
 	"ignore": IGNORE,
 	"if":     IF,
 	"unique": UNIQUE,
 	"using":  USING,
-
-	"begin":    BEGIN,
-	"commit":   COMMIT,
-	"rollback": ROLLBACK,
 }
 
 func (tkn *Tokenizer) Lex(lval *yySymType) int {
@@ -330,7 +333,7 @@ func (tkn *Tokenizer) scanString(delim uint16) *Node {
 			if tkn.lastChar == EOFCHAR {
 				return NewParseNode(LEX_ERROR, buffer.Bytes())
 			}
-			if decodedChar := SqlDecodeMap[byte(tkn.lastChar)]; decodedChar == DONTESCAPE {
+			if decodedChar := sqltypes.SqlDecodeMap[byte(tkn.lastChar)]; decodedChar == sqltypes.DONTESCAPE {
 				ch = tkn.lastChar
 			} else {
 				ch = uint16(decodedChar)
