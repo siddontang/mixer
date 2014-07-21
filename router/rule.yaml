@@ -1,0 +1,31 @@
+rules:
+-
+    db: mixer
+    table: test 
+    key: id
+    type: hash
+    # node will be node1, node2, ... node10
+    nodes: node(1-10)
+
+-
+    db: mixer
+    table: test2 
+    key: name
+    nodes: node1,node2,node3
+    
+    type: range
+
+    # range is left close and right open
+    # node1 range min-6FFFFFFFFFFFFFFF 
+    # node2 range 6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF
+    # node3 range AFFFFFFFFFFFFFFF-max
+
+    range: -6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF-
+
+-   db: mixer
+    table: 
+    key:
+    nodes: node1
+
+    # any other table not set above will use default rule
+    type: default

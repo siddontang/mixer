@@ -66,22 +66,28 @@ type HashShard struct {
 	ShardNum int
 }
 
-func (s *HashShard) FindForKey(key interface{}) (i int, err error) {
-	defer handleError(&err)
+func (s *HashShard) FindForKey(key interface{}) int {
 	h := HashValue(key)
 
-	return int(h % uint64(s.ShardNum)), nil
+	return int(h % uint64(s.ShardNum))
 }
 
 type RangeShard struct {
 	Shards []KeyRange
 }
 
-func (s *RangeShard) FindForKey(key interface{}) (i int, err error) {
+func (s *RangeShard) FindForKey(key interface{}) int {
 	for i, r := range s.Shards {
 		if r.Contains(KeyspaceId(EncodeValue(key))) {
-			return i, nil
+			return i
 		}
 	}
 	panic(NewKeyError("Unexpected key %v, not in range", key))
+}
+
+type DefaultShard struct {
+}
+
+func (s *DefaultShard) FindForKey(key interface{}) int {
+	return 0
 }
