@@ -53,7 +53,7 @@ rules:
 		t.Fatal(hashRule.Type)
 	}
 
-	if n := hashRule.FindForKey(uint64(11)); n != "node2" {
+	if n := hashRule.FindNode(uint64(11)); n != "node2" {
 		t.Fatal(n)
 	}
 
@@ -64,7 +64,7 @@ rules:
 
 	k, _ := HexKeyspaceId("7FFFFFFFFFFFFFFF").Unhex()
 
-	if n := rangeRule.FindForKey(string(k)); n != "node2" {
+	if n := rangeRule.FindNode(string(k)); n != "node2" {
 		t.Fatal(n)
 	}
 
@@ -77,7 +77,7 @@ rules:
 		t.Fatal(defaultRule.Type)
 	}
 
-	if n := defaultRule.FindForKey(11); n != "node1" {
+	if n := defaultRule.FindNode(11); n != "node1" {
 		t.Fatal(n)
 	}
 }

@@ -12,7 +12,7 @@ rules:
     table: test2 
     key: name
     nodes: node1,node2,node3
-    
+
     type: range
 
     # range is left close and right open

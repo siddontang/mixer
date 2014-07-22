@@ -15,9 +15,13 @@ type Rule struct {
 	Shard Shard
 }
 
-func (r *Rule) FindForKey(key interface{}) string {
+func (r *Rule) FindNode(key interface{}) string {
 	i := r.Shard.FindForKey(key)
 	return r.Nodes[i]
+}
+
+func (r *Rule) FindNodeIndex(key interface{}) int {
+	return r.Shard.FindForKey(key)
 }
 
 type DBRules struct {
