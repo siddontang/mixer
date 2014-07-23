@@ -2,6 +2,8 @@ package router
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v1"
+	"io/ioutil"
 )
 
 type Rule struct {
@@ -85,4 +87,27 @@ func NewRouter(cfg *Config) (*Router, error) {
 		}
 	}
 	return rt, nil
+}
+
+func NewRouterConfigData(data []byte) (*Router, error) {
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
+		return nil, err
+	}
+
+	return NewRouter(&cfg)
+}
+
+func NewRouterConfigFile(fileName string) (*Router, error) {
+	data, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
+		return nil, err
+	}
+
+	return NewRouter(&cfg)
 }

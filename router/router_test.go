@@ -10,7 +10,7 @@ func TestParseRule(t *testing.T) {
 rules:
 -
     db: mixer
-    table: test 
+    table: test1 
     key: id
     # node will be node1, node2, ... node10
     type: hash
@@ -48,7 +48,7 @@ rules:
 		t.Fatal("must not nil")
 	}
 
-	hashRule := rt.GetRule("mixer", "test")
+	hashRule := rt.GetRule("mixer", "test1")
 	if hashRule.Type != HashRuleType {
 		t.Fatal(hashRule.Type)
 	}

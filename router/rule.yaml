@@ -1,7 +1,7 @@
 rules:
 -
     db: mixer
-    table: test 
+    table: test1 
     key: id
     type: hash
     # node will be node1, node2, ... node10
