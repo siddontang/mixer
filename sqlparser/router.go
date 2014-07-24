@@ -11,11 +11,6 @@ import (
 )
 
 const (
-	ROUTE_BY_CONDITION = iota
-	ROUTE_BY_VALUE
-)
-
-const (
 	EID_NODE = iota
 	VALUE_NODE
 	LIST_NODE
@@ -23,20 +18,29 @@ const (
 )
 
 type RoutingPlan struct {
-	rule        *router.Rule
-	routingType int
-	criteria    *Node
+	rule *router.Rule
+
+	criteria SQLNode
 }
 
+/*
+	Limitation:
+
+	where, eg, key name is id, only supports below now:
+
+		where id = 1
+		where id in (1, 2, 3)
+		where id > 1
+		where id >= 1
+		where id < 1
+		where id <= 1
+		where id between 1 and 10
+*/
 func GetShardList(sql string, bindVariables map[string]interface{}, r *router.DBRules) (nodes []string, err error) {
 	defer handleError(&err)
 
 	plan := buildPlan(sql, r)
-	if plan.rule.Type == router.DefaultRuleType {
-		return plan.rule.Nodes, nil
-	}
-
-	ns := shardListFromPlan(plan, bindVariables)
+	ns := plan.shardListFromPlan(bindVariables)
 
 	nodes = make([]string, 0, len(ns))
 	for _, i := range ns {
@@ -54,113 +58,107 @@ func buildPlan(sql string, r *router.DBRules) (plan *RoutingPlan) {
 	return getRoutingPlan(statement, r)
 }
 
-func shardListFromPlan(plan *RoutingPlan, bindVariables map[string]interface{}) (shardList []int) {
-	r := plan.rule
-
-	if plan.routingType == ROUTE_BY_VALUE {
-		index := plan.criteria.findInsertShard(bindVariables, r)
-		return []int{index}
-	}
-
+func (plan *RoutingPlan) shardListFromPlan(bindVariables map[string]interface{}) (shardList []int) {
 	if plan.criteria == nil {
-		return makeList(0, len(r.Nodes))
+		return makeList(0, len(plan.rule.Nodes))
 	}
 
-	switch plan.criteria.Type {
-	case '=', NULL_SAFE_EQUAL:
-		index := plan.criteria.NodeAt(1).findShard(bindVariables, r)
+	switch criteria := plan.criteria.(type) {
+	case Values:
+		index := plan.findInsertShard(criteria, bindVariables)
 		return []int{index}
-	case '<', LE:
-		if r.Type == router.HashRuleType {
-			return makeList(0, len(r.Nodes))
+	case *ComparisonExpr:
+		switch criteria.Operator {
+		case "=", "<=>":
+			index := plan.findShard(criteria.Right, bindVariables)
+			return []int{index}
+		case "<", "<=":
+			if plan.rule.Type == router.HashRuleType {
+				return makeList(0, len(plan.rule.Nodes))
+			}
+
+			index := plan.findShard(criteria.Right, bindVariables)
+			return makeList(0, index+1)
+		case ">", ">=":
+			if plan.rule.Type == router.HashRuleType {
+				return makeList(0, len(plan.rule.Nodes))
+			}
+
+			index := plan.findShard(criteria.Right, bindVariables)
+			return makeList(index, len(plan.rule.Nodes))
+		case "in":
+			return plan.findShardList(criteria.Right, bindVariables)
+		}
+	case *RangeCond:
+		if plan.rule.Type == router.HashRuleType {
+			return makeList(0, len(plan.rule.Nodes))
 		}
 
-		index := plan.criteria.NodeAt(1).findShard(bindVariables, r)
-		return makeList(0, index+1)
-	case '>', GE:
-		if r.Type == router.HashRuleType {
-			return makeList(0, len(r.Nodes))
+		if criteria.Operator == "between" {
+			start := plan.findShard(criteria.From, bindVariables)
+			last := plan.findShard(criteria.To, bindVariables)
+			if last < start {
+				start, last = last, start
+			}
+			return makeList(start, last+1)
 		}
-
-		index := plan.criteria.NodeAt(1).findShard(bindVariables, r)
-		return makeList(index, len(r.Nodes))
-	case IN:
-		return plan.criteria.NodeAt(1).findShardList(bindVariables, r)
-	case BETWEEN:
-		if r.Type == router.HashRuleType {
-			return makeList(0, len(r.Nodes))
-		}
-
-		start := plan.criteria.NodeAt(1).findShard(bindVariables, r)
-		last := plan.criteria.NodeAt(2).findShard(bindVariables, r)
-		if last < start {
-			start, last = last, start
-		}
-		return makeList(start, last+1)
 	}
-	return makeList(0, len(r.Nodes))
+	return makeList(0, len(plan.rule.Nodes))
 }
 
 func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) {
 	plan = &RoutingPlan{}
-	var tableNode *Node
 	if ins, ok := statement.(*Insert); ok {
-		tableNode = ins.Table
-		if _, ok := ins.Values.(SelectStatement); ok {
+		if _, ok := ins.Rows.(SelectStatement); ok {
 			panic(NewParserError("select in insert not allowed"))
 		}
 
-		plan.rule = r.GetRule(tableNode.String())
-
-		plan.routingType = ROUTE_BY_VALUE
-		plan.criteria = ins.Values.(*Node).NodeAt(0).routingAnalyzeValues(plan.rule)
+		plan.rule = r.GetRule(String(ins.Table))
+		plan.criteria = plan.routingAnalyzeValues(ins.Rows.(Values))
 		return plan
 	}
-	var where *Node
-	plan.routingType = ROUTE_BY_CONDITION
+	var where *Where
 	switch stmt := statement.(type) {
 	case *Select:
-		//now only support from only one table
-		tableNode = stmt.From[0]
+		plan.rule = r.GetRule(String(stmt.From[0]))
 		where = stmt.Where
 	case *Update:
-		tableNode = stmt.Table
+		plan.rule = r.GetRule(String(stmt.Table))
 		where = stmt.Where
 	case *Delete:
-		tableNode = stmt.Table
+		plan.rule = r.GetRule(String(stmt.Table))
 		where = stmt.Where
 	}
 
-	plan.rule = r.GetRule(tableNode.String())
-
-	if where != nil && where.Len() > 0 {
-		plan.criteria = where.NodeAt(0).routingAnalyzeBoolean(plan.rule)
+	if where != nil {
+		plan.criteria = plan.routingAnalyzeBoolean(where.Expr)
+	} else {
+		plan.rule = r.DefaultRule
 	}
-
 	return plan
 }
 
-func (node *Node) routingAnalyzeValues(r *router.Rule) *Node {
+func (plan *RoutingPlan) routingAnalyzeValues(vals Values) Values {
 	// Analyze first value of every item in the list
-	for i := 0; i < node.Len(); i++ {
-		value_expression_list := node.NodeAt(i)
-		inner_list, ok := value_expression_list.At(0).(*Node)
-		if !ok {
-			panic(NewParserError("insert is too complex"))
-		}
-		result := inner_list.NodeAt(0).routingAnalyzeValue(r)
-		if result != VALUE_NODE {
+	for i := 0; i < len(vals); i++ {
+		switch tuple := vals[i].(type) {
+		case ValTuple:
+			result := plan.routingAnalyzeValue(tuple[0])
+			if result != VALUE_NODE {
+				panic(NewParserError("insert is too complex"))
+			}
+		default:
 			panic(NewParserError("insert is too complex"))
 		}
 	}
-	return node
+	return vals
 }
 
-func (node *Node) routingAnalyzeBoolean(r *router.Rule) *Node {
-	switch node.Type {
-	case AND:
-		left := node.NodeAt(0).routingAnalyzeBoolean(r)
-		right := node.NodeAt(1).routingAnalyzeBoolean(r)
+func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) BoolExpr {
+	switch node := node.(type) {
+	case *AndExpr:
+		left := plan.routingAnalyzeBoolean(node.Left)
+		right := plan.routingAnalyzeBoolean(node.Right)
 		if left != nil && right != nil {
 			return nil
 		} else if left != nil {
@@ -168,70 +166,62 @@ func (node *Node) routingAnalyzeBoolean(r *router.Rule) *Node {
 		} else {
 			return right
 		}
-	case '(':
-		sub, ok := node.At(0).(*Node)
-		if !ok {
+	case *ParenBoolExpr:
+		return plan.routingAnalyzeBoolean(node.Expr)
+	case *ComparisonExpr:
+		switch {
+		case StringIn(node.Operator, "=", "<", ">", "<=", ">=", "<=>"):
+			left := plan.routingAnalyzeValue(node.Left)
+			right := plan.routingAnalyzeValue(node.Right)
+			if (left == EID_NODE && right == VALUE_NODE) || (left == VALUE_NODE && right == EID_NODE) {
+				return node
+			}
+		case node.Operator == "in":
+			left := plan.routingAnalyzeValue(node.Left)
+			right := plan.routingAnalyzeValue(node.Right)
+			if left == EID_NODE && right == LIST_NODE {
+				return node
+			}
+		}
+	case *RangeCond:
+		if node.Operator != "between" {
 			return nil
 		}
-		return sub.routingAnalyzeBoolean(r)
-	case '=', '<', '>', LE, GE, NULL_SAFE_EQUAL:
-		left := node.NodeAt(0).routingAnalyzeValue(r)
-		right := node.NodeAt(1).routingAnalyzeValue(r)
-		if (left == EID_NODE && right == VALUE_NODE) || (left == VALUE_NODE && right == EID_NODE) {
-			return node
-		}
-	case IN:
-		left := node.NodeAt(0).routingAnalyzeValue(r)
-		right := node.NodeAt(1).routingAnalyzeValue(r)
-		if left == EID_NODE && right == LIST_NODE {
-			return node
-		}
-	case BETWEEN:
-		left := node.NodeAt(0).routingAnalyzeValue(r)
-		right1 := node.NodeAt(1).routingAnalyzeValue(r)
-		right2 := node.NodeAt(2).routingAnalyzeValue(r)
-		if left == EID_NODE && right1 == VALUE_NODE && right2 == VALUE_NODE {
+		left := plan.routingAnalyzeValue(node.Left)
+		from := plan.routingAnalyzeValue(node.From)
+		to := plan.routingAnalyzeValue(node.To)
+		if left == EID_NODE && from == VALUE_NODE && to == VALUE_NODE {
 			return node
 		}
 	}
 	return nil
 }
 
-func (node *Node) routingAnalyzeValue(r *router.Rule) int {
-	switch node.Type {
-	case ID:
-		if string(node.Value) == r.Key {
+func (plan *RoutingPlan) routingAnalyzeValue(valExpr ValExpr) int {
+	switch node := valExpr.(type) {
+	case *ColName:
+		if string(node.Name) == plan.rule.Key {
 			return EID_NODE
 		}
-	case '.':
-		return node.NodeAt(1).routingAnalyzeValue(r)
-	case '(':
-		sub, ok := node.At(0).(*Node)
-		if !ok {
-			return OTHER_NODE
-		}
-		return sub.routingAnalyzeValue(r)
-	case NODE_LIST:
-		for i := 0; i < node.Len(); i++ {
-			if node.NodeAt(i).routingAnalyzeValue(r) != VALUE_NODE {
+	case ValTuple:
+		for _, n := range node {
+			if plan.routingAnalyzeValue(n) != VALUE_NODE {
 				return OTHER_NODE
 			}
 		}
 		return LIST_NODE
-	case STRING, NUMBER, VALUE_ARG:
+	case StrVal, NumVal, ValArg:
 		return VALUE_NODE
 	}
 	return OTHER_NODE
 }
 
-func (node *Node) findShardList(bindVariables map[string]interface{}, r *router.Rule) []int {
+func (plan *RoutingPlan) findShardList(valExpr ValExpr, bindVariables map[string]interface{}) []int {
 	shardset := make(map[int]bool)
-	switch node.Type {
-	case '(':
-		return node.NodeAt(0).findShardList(bindVariables, r)
-	case NODE_LIST:
-		for i := 0; i < node.Len(); i++ {
-			index := node.NodeAt(i).findShard(bindVariables, r)
+	switch node := valExpr.(type) {
+	case ValTuple:
+		for _, n := range node {
+			index := plan.findShard(n, bindVariables)
 			shardset[index] = true
 		}
 	}
@@ -241,14 +231,15 @@ func (node *Node) findShardList(bindVariables map[string]interface{}, r *router.
 		shardlist[index] = k
 		index++
 	}
+
 	return shardlist
 }
 
-func (node *Node) findInsertShard(bindVariables map[string]interface{}, r *router.Rule) int {
+func (plan *RoutingPlan) findInsertShard(vals Values, bindVariables map[string]interface{}) int {
 	index := -1
-	for i := 0; i < node.Len(); i++ {
-		first_value_expression := node.NodeAt(i).NodeAt(0).NodeAt(0) // '('->value_expression_list->first_value
-		newIndex := first_value_expression.findShard(bindVariables, r)
+	for i := 0; i < len(vals); i++ {
+		first_value_expression := vals[i].(ValTuple)[0]
+		newIndex := plan.findShard(first_value_expression, bindVariables)
 		if index == -1 {
 			index = newIndex
 		} else if index != newIndex {
@@ -258,37 +249,41 @@ func (node *Node) findInsertShard(bindVariables map[string]interface{}, r *route
 	return index
 }
 
-func (node *Node) findShard(bindVariables map[string]interface{}, r *router.Rule) int {
-	value := node.getBoundValue(bindVariables)
-	return r.FindNodeIndex(value)
+func (plan *RoutingPlan) findShard(valExpr ValExpr, bindVariables map[string]interface{}) int {
+	value := getBoundValue(valExpr, bindVariables)
+	return plan.rule.FindNodeIndex(value)
 }
 
-func (node *Node) getBoundValue(bindVariables map[string]interface{}) interface{} {
-	switch node.Type {
-	case '(':
-		return node.NodeAt(0).getBoundValue(bindVariables)
-	case STRING:
-		return string(node.Value)
-	case NUMBER:
-		val, err := strconv.ParseInt(string(node.Value), 10, 64)
+func getBoundValue(valExpr ValExpr, bindVariables map[string]interface{}) interface{} {
+	switch node := valExpr.(type) {
+	case ValTuple:
+		if len(node) != 1 {
+			panic(NewParserError("tuples not allowed as insert values"))
+		}
+		// TODO: Change parser to create single value tuples into non-tuples.
+		return getBoundValue(node[0], bindVariables)
+	case StrVal:
+		return string(node)
+	case NumVal:
+		val, err := strconv.ParseInt(string(node), 10, 64)
 		if err != nil {
 			panic(NewParserError("%s", err.Error()))
 		}
 		return val
-	case VALUE_ARG:
-		value := node.findBindValue(bindVariables)
+	case ValArg:
+		value := findBindValue(node, bindVariables)
 		return value
 	}
 	panic("Unexpected token")
 }
 
-func (node *Node) findBindValue(bindVariables map[string]interface{}) interface{} {
+func findBindValue(valArg ValArg, bindVariables map[string]interface{}) interface{} {
 	if bindVariables == nil {
-		panic(NewParserError("No bind variable for " + string(node.Value)))
+		panic(NewParserError("No bind variable for " + string(valArg)))
 	}
-	value, ok := bindVariables[string(node.Value[1:])]
+	value, ok := bindVariables[string(valArg[1:])]
 	if !ok {
-		panic(NewParserError("No bind variable for " + string(node.Value)))
+		panic(NewParserError("No bind variable for " + string(valArg)))
 	}
 	return value
 }
