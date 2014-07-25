@@ -7,4 +7,5 @@ fi
 
 source ./dev.env
 
-go get -u github.com/siddontang/go-log/log
+go get github.com/siddontang/go-log/log
+go get gopkg.in/yaml.v1

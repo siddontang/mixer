@@ -7,7 +7,7 @@ package sqlparser
 import (
 	"errors"
 
-	"github.com/youtube/vitess/go/sqltypes"
+	"github.com/siddontang/mixer/sqltypes"
 )
 
 // Instructions for creating new types: If a type
