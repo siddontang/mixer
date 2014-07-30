@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/siddontang/go-log/log"
+	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	. "github.com/siddontang/mixer/parser"
 	"strconv"
@@ -142,7 +143,7 @@ func (c *conn) selectInfoFunc(l *lex, value interface{}) (*Resultset, error) {
 	return r, nil
 }
 
-func routeSelect(nodeName string, co *SqlConn, query string, args ...interface{}) interface{} {
+func routeSelect(nodeName string, co *client.SqlConn, query string, args ...interface{}) interface{} {
 	r, err := co.Query(query, args...)
 	if err != nil {
 		log.Error("node %s query error %s", nodeName, err.Error())

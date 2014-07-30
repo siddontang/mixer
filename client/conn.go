@@ -1,10 +1,11 @@
-package mysql
+package client
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	. "github.com/siddontang/mixer/mysql"
 	"net"
 	"strings"
 	"time"
@@ -472,7 +473,7 @@ func (c *Conn) exec(query string) (*Result, error) {
 func (c *Conn) readResultset(data []byte, binary bool) (*ResultsetData, error) {
 	result := new(ResultsetData)
 
-	result.binary = binary
+	result.Binary = binary
 
 	// column count
 	count, _, n := LengthEncodedInt(data)

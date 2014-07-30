@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/siddontang/go-log/log"
-	. "github.com/siddontang/mixer/mysql"
+	"github.com/siddontang/mixer/client"
 	"strings"
 	"sync"
 	"time"
@@ -24,7 +24,7 @@ type node struct {
 	Name string
 
 	//current running db
-	db *DB
+	db *client.DB
 
 	dbs *list.List
 
@@ -47,16 +47,16 @@ func newNode(server *Server, cfgNode *configDataNode) (*node, error) {
 	n.dbs = list.New()
 
 	var err error
-	var db *DB
+	var db *client.DB
 	for _, cfg := range cfgNode.Backends {
-		db, err = NewDB(cfg)
+		db, err = client.NewDB(cfg)
 		if err != nil {
 			return nil, err
 		}
 		n.dbs.PushBack(db)
 	}
 
-	n.db = n.dbs.Front().Value.(*DB)
+	n.db = n.dbs.Front().Value.(*client.DB)
 
 	if err != nil {
 		return nil, err
@@ -79,12 +79,12 @@ func newNode(server *Server, cfgNode *configDataNode) (*node, error) {
 	return n, nil
 }
 
-func (n *node) GetConn() (*SqlConn, error) {
+func (n *node) GetConn() (*client.SqlConn, error) {
 	n.Lock()
 	db := n.db
 	n.Unlock()
 
-	return NewSqlConn(db)
+	return client.NewSqlConn(db)
 }
 
 func (n *node) run() {
@@ -124,13 +124,13 @@ func (n *node) switchOver() {
 	v := n.dbs.Front()
 	n.dbs.Remove(v)
 
-	db := v.Value.(*DB)
+	db := v.Value.(*client.DB)
 
 	db.Close()
 
 	n.dbs.PushBack(db)
 
-	db = n.dbs.Front().Value.(*DB)
+	db = n.dbs.Front().Value.(*client.DB)
 
 	n.Lock()
 	n.db = db

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/siddontang/go-log/log"
+	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	. "github.com/siddontang/mixer/parser"
+
 	"strings"
 )
 
@@ -119,7 +121,7 @@ func (c *conn) commit() (err error) {
 		co.Close()
 	}
 
-	c.txConns = map[*node]*SqlConn{}
+	c.txConns = map[*node]*client.SqlConn{}
 
 	return
 }
@@ -134,12 +136,12 @@ func (c *conn) rollback() (err error) {
 		co.Close()
 	}
 
-	c.txConns = map[*node]*SqlConn{}
+	c.txConns = map[*node]*client.SqlConn{}
 
 	return
 }
 
-type routeFunc func(name string, co *SqlConn, query string, args ...interface{}) interface{}
+type routeFunc func(name string, co *client.SqlConn, query string, args ...interface{}) interface{}
 
 //if status is in_trans, need
 //else if status is not autocommit, need
@@ -148,7 +150,7 @@ func (c *conn) needBeginTx() bool {
 	return c.isInTransaction() || !c.isAutoCommit()
 }
 
-func (c *conn) getDBConn(n *node) (co *SqlConn, err error) {
+func (c *conn) getDBConn(n *node) (co *client.SqlConn, err error) {
 	if !c.needBeginTx() {
 		co, err = n.GetConn()
 		if err != nil {
@@ -221,7 +223,7 @@ LOOP:
 	return results, nil
 }
 
-func routeExec(nodeName string, co *SqlConn, query string, args ...interface{}) interface{} {
+func routeExec(nodeName string, co *client.SqlConn, query string, args ...interface{}) interface{} {
 	r, err := co.Exec(query, args...)
 	if err != nil {
 		log.Error("node %s exec error %s", nodeName, err.Error())

@@ -1,7 +1,8 @@
-package mysql
+package client
 
 import (
 	"fmt"
+	. "github.com/siddontang/mixer/mysql"
 	"testing"
 )
 

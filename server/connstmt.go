@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/siddontang/go-log/log"
+	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	. "github.com/siddontang/mixer/parser"
 	"math"
@@ -33,7 +34,7 @@ func (s *stmt) ResetParams() {
 	s.l.Args = make([]interface{}, s.params)
 }
 
-func routePrepare(nodeName string, co *SqlConn, query string, args ...interface{}) interface{} {
+func routePrepare(nodeName string, co *client.SqlConn, query string, args ...interface{}) interface{} {
 	if len(args) > 0 {
 		return fmt.Errorf("prepare cannot have args")
 	}

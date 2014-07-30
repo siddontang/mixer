@@ -1,8 +1,10 @@
-package mysql
+package client
 
 import (
 	"container/list"
 	"encoding/json"
+	. "github.com/siddontang/mixer/mysql"
+
 	"sync"
 )
 

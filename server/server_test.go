@@ -1,7 +1,7 @@
 package server
 
 import (
-	. "github.com/siddontang/mixer/mysql"
+	"github.com/siddontang/mixer/client"
 	"sync"
 	"testing"
 	"time"
@@ -10,13 +10,13 @@ import (
 var testServerOnce sync.Once
 var testServer *Server
 var testDBOnce sync.Once
-var testDB *DB
+var testDB *client.DB
 
 var configJson = []byte(`
 {
     "addr" : "127.0.0.1:4000",
-    "user": "qing",
-    "password": "admin",
+    "user": "root",
+    "password": "",
 
     "nodes" : [
         {
@@ -26,8 +26,8 @@ var configJson = []byte(`
             "backends" : [
                 {
                     "addr" : "127.0.0.1:3306",
-                    "user" : "qing",
-                    "password": "admin",
+                    "user" : "root",
+                    "password": "",
                     "db" : "mixer",
                     "idle_conns" : 32
                 }
@@ -41,8 +41,8 @@ var configJson = []byte(`
             "backends" : [
                 {
                     "addr" : "127.0.0.1:3306",
-                    "user" : "qing",
-                    "password": "admin",
+                    "user" : "root",
+                    "password": "",
                     "db" : "mixer",
                     "idle_conns" : 32
                 }
@@ -79,21 +79,21 @@ func newTestServer() *Server {
 	return testServer
 }
 
-func newTestDB() *DB {
+func newTestDB() *client.DB {
 	newTestServer()
 
 	f := func() {
 		var cfg = []byte(`
 			{
 			    "addr" : "127.0.0.1:4000",
-                "user" : "qing",
-                "password": "admin",
+                "user" : "root",
+                "password": "",
                 "db" : "mixer",
                 "idle_conns" : 4
 			}
 			`)
 		var err error
-		testDB, err = NewDB(cfg)
+		testDB, err = client.NewDB(cfg)
 
 		if err != nil {
 			println(err.Error())
@@ -105,10 +105,10 @@ func newTestDB() *DB {
 	return testDB
 }
 
-func newTestDBConn() *SqlConn {
+func newTestDBConn() *client.SqlConn {
 	db := newTestDB()
 
-	c, err := NewSqlConn(db)
+	c, err := client.NewSqlConn(db)
 
 	if err != nil {
 		println(err.Error())

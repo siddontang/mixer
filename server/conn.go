@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/siddontang/go-log/log"
+	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	"net"
 	"runtime"
@@ -41,7 +42,7 @@ type conn struct {
 
 	curSchema *schema
 
-	txConns map[*node]*SqlConn
+	txConns map[*node]*client.SqlConn
 
 	stmtId uint32
 	stmts  map[uint32]*stmt
@@ -72,7 +73,7 @@ func newconn(s *Server, co net.Conn) *conn {
 
 	c.salt, _ = RandomBuf(20)
 
-	c.txConns = make(map[*node]*SqlConn)
+	c.txConns = make(map[*node]*client.SqlConn)
 	c.stmts = make(map[uint32]*stmt)
 
 	c.closed = false
