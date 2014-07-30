@@ -4,6 +4,7 @@ import (
 	"github.com/siddontang/go-log/log"
 	"net"
 	"runtime"
+	"strings"
 )
 
 type Server struct {
@@ -48,7 +49,14 @@ func NewServer(cfgDir string) *Server {
 
 func (s *Server) Start() error {
 	var err error
-	s.listener, err = net.Listen("tcp", s.addr)
+
+	netProto := "tcp"
+	if strings.Contains(s.addr, "/") {
+		netProto = "unix"
+	}
+
+	s.listener, err = net.Listen(netProto, s.addr)
+
 	if err != nil {
 		log.Error("listen error %s", err.Error())
 		return err
