@@ -8,7 +8,7 @@ import (
 func newTestConn() *Conn {
 	c := new(Conn)
 
-	if err := c.Connect("127.0.0.1:3306", "qing", "admin", "mixer"); err != nil {
+	if err := c.Connect("127.0.0.1:3306", "root", "", "mixer"); err != nil {
 		panic(err)
 	}
 

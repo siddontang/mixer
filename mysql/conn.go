@@ -329,6 +329,23 @@ func (c *Conn) Ping() error {
 	return nil
 }
 
+func (c *Conn) UseDB(dbName string) error {
+	if c.db == dbName {
+		return nil
+	}
+
+	if err := c.writeCommandStr(COM_INIT_DB, dbName); err != nil {
+		return err
+	}
+
+	c.db = dbName
+	return nil
+}
+
+func (c *Conn) GetDB() string {
+	return c.db
+}
+
 func (c *Conn) Exec(command string, args ...interface{}) (*Result, error) {
 	if len(args) == 0 {
 		return c.exec(command)
