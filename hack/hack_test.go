@@ -2,7 +2,6 @@ package hack
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 )
 
