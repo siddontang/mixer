@@ -31,6 +31,10 @@ func NewDB(jsonConfig json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
+	return Open(cfg)
+}
+
+func Open(cfg *Config) (*DB, error) {
 	db := new(DB)
 	db.cfg = cfg
 	db.conns = list.New()
@@ -40,6 +44,10 @@ func NewDB(jsonConfig json.RawMessage) (*DB, error) {
 
 func (db *DB) Addr() string {
 	return db.cfg.Addr
+}
+
+func (db *DB) Config() *Config {
+	return db.cfg
 }
 
 func (db *DB) Close() error {

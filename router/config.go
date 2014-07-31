@@ -14,16 +14,16 @@ var (
 )
 
 type RuleConfig struct {
-	DB    string
-	Table string
-	Key   string
-	Nodes string
-	Type  string
-	Range string
+	DB    string `yaml:"db"`
+	Table string `yaml:"table"`
+	Key   string `yaml:"key"`
+	Nodes string `yaml:"nodes"`
+	Type  string `yaml:"type"`
+	Range string `yaml:"range"`
 }
 
 type Config struct {
-	Rules []RuleConfig
+	Rules []RuleConfig `yaml:"rules"`
 }
 
 func (c *RuleConfig) ParseRule() (*Rule, error) {

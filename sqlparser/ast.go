@@ -857,3 +857,28 @@ func (node OnDup) Format(buf *TrackedBuffer) {
 	}
 	buf.Fprintf(" on duplicate key update %v", UpdateExprs(node))
 }
+
+func (*Begin) IStatement()    {}
+func (*Commit) IStatement()   {}
+func (*Rollback) IStatement() {}
+
+type Begin struct {
+}
+
+func (node *Begin) Format(buf *TrackedBuffer) {
+	buf.Fprintf("begin")
+}
+
+type Commit struct {
+}
+
+func (node *Commit) Format(buf *TrackedBuffer) {
+	buf.Fprintf("commit")
+}
+
+type Rollback struct {
+}
+
+func (node *Rollback) Format(buf *TrackedBuffer) {
+	buf.Fprintf("rollback")
+}

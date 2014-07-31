@@ -104,6 +104,10 @@ var keywords = map[string]int{
 	"if":     IF,
 	"unique": UNIQUE,
 	"using":  USING,
+
+	"begin":    BEGIN,
+	"rollback": ROLLBACK,
+	"commit":   COMMIT,
 }
 
 // Lex returns the next token form the Tokenizer.

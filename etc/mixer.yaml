@@ -10,30 +10,36 @@ nodes :
 - 
     name : node1 
 
-    # switch another backup mysql after N seconds when current is noalive
-    # 0 will no switch
-    switch_after_noalive : 300
-
     # default idle conns for mysql server
     idle_conns : 16
 
     # if rw_split is true, select will use slave server
     rw_split: true
 
+    # all mysql in a node must have the same user and password
+    user : root
+    password: 
+
     # master represents a real mysql master server 
-    # dns format: user:password@addr
-    master : root:@127.0.0.1:3306
+    master : 127.0.0.1:3306
 
     # master backup server 
-    master_backup : root:@127.0.0.1:3307
+    master_backup : 127.0.0.1:3307
 
     # slave represents a real mysql salve server 
-    slave : root:@127.0.0.1:4306
+    slave : 127.0.0.1:4306
+
+    # down mysql after N seconds noalive
+    # 0 will no down
+    down_after_noalive : 300
 
 -
     name : node2 
 
-    master : root:@127.0.0.1:3308
+    user: root 
+    password: 
+
+    master : 127.0.0.1:3308
 
 
 # schema defines which db can be used by client and this db's sql will be executed in which nodes

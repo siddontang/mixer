@@ -37,9 +37,20 @@ type RoutingPlan struct {
 		where id between 1 and 10
 */
 func GetShardList(sql string, bindVariables map[string]interface{}, r *router.DBRules) (nodes []string, err error) {
+	var stmt Statement
+	stmt, err = Parse(sql)
+	if err != nil {
+		return nil, err
+	}
+
+	return GetStmtShardList(stmt, bindVariables, r)
+}
+
+func GetStmtShardList(stmt Statement, bindVariables map[string]interface{}, r *router.DBRules) (nodes []string, err error) {
 	defer handleError(&err)
 
-	plan := buildPlan(sql, r)
+	plan := getRoutingPlan(stmt, r)
+
 	ns := plan.shardListFromPlan(bindVariables)
 
 	nodes = make([]string, 0, len(ns))
@@ -48,14 +59,6 @@ func GetShardList(sql string, bindVariables map[string]interface{}, r *router.DB
 	}
 
 	return nodes, nil
-}
-
-func buildPlan(sql string, r *router.DBRules) (plan *RoutingPlan) {
-	statement, err := Parse(sql)
-	if err != nil {
-		panic(err)
-	}
-	return getRoutingPlan(statement, r)
 }
 
 func (plan *RoutingPlan) shardListFromPlan(bindVariables map[string]interface{}) (shardList []int) {
