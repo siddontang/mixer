@@ -184,3 +184,8 @@ func NewSqlConn(db *DB) (*SqlConn, error) {
 	c, err := db.PopConn()
 	return &SqlConn{c, db}, err
 }
+
+func (db *DB) GetConn() (*SqlConn, error) {
+	c, err := db.PopConn()
+	return &SqlConn{c, db}, err
+}

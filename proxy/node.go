@@ -51,6 +51,36 @@ func (n *Node) String() string {
 	return n.cfg.Name
 }
 
+func (n *Node) getMasterConn() (*client.SqlConn, error) {
+	n.Lock()
+	db := n.db
+	n.Unlock()
+
+	if db == nil {
+		return nil, fmt.Errorf("master is down")
+	}
+
+	return db.GetConn()
+}
+
+func (n *Node) getSelectConn() (*client.SqlConn, error) {
+	var db *client.DB
+
+	n.Lock()
+	if n.cfg.RWSplit && n.slave != nil {
+		db = n.slave
+	} else {
+		db = n.db
+	}
+	n.Unlock()
+
+	if db == nil {
+		return nil, fmt.Errorf("no alive mysql server")
+	}
+
+	return db.GetConn()
+}
+
 func (n *Node) checkMaster() {
 	n.Lock()
 	db := n.db
