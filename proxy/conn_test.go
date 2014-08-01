@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	//. "github.com/siddontang/mixer/mysql"
+	. "github.com/siddontang/mixer/mysql"
 	"testing"
 )
 
@@ -67,67 +67,67 @@ func TestConn_Insert(t *testing.T) {
 	}
 }
 
-// func TestConn_Select(t *testing.T) {
-// 	s := `select str, f, e, u, i, ni from mixer_test_proxy_conn where id = 1`
+func TestConn_Select(t *testing.T) {
+	s := `select str, f, e, u, i, ni from mixer_test_proxy_conn where id = 1`
 
-// 	c := newTestDBConn()
-// 	defer c.Close()
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	if r, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.RowNumber() != 1 {
-// 			t.Fatal(r.RowNumber())
-// 		}
+	if r, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.RowNumber() != 1 {
+			t.Fatal(r.RowNumber())
+		}
 
-// 		if r.ColumnNumber() != 6 {
-// 			t.Fatal(r.ColumnNumber())
-// 		}
+		if r.ColumnNumber() != 6 {
+			t.Fatal(r.ColumnNumber())
+		}
 
-// 		if v, _ := r.GetString(0, 0); v != `abc` {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetString(0, 0); v != `abc` {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetFloat(0, 1); v != 3.14 {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetFloat(0, 1); v != 3.14 {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetString(0, 2); v != `test1` {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetString(0, 2); v != `test1` {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetUint(0, 3); v != 255 {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetUint(0, 3); v != 255 {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetInt(0, 4); v != -127 {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetInt(0, 4); v != -127 {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.IsNull(0, 5); !v {
-// 			t.Fatal("ni not null")
-// 		}
-// 	}
-// }
+		if v, _ := r.IsNull(0, 5); !v {
+			t.Fatal("ni not null")
+		}
+	}
+}
 
-// func TestConn_Update(t *testing.T) {
-// 	s := `update mixer_test_proxy_conn set str = "123" where id = 1`
+func TestConn_Update(t *testing.T) {
+	s := `update mixer_test_proxy_conn set str = "123" where id = 1`
 
-// 	c := newTestDBConn()
-// 	defer c.Close()
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	if _, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if _, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if r, err := c.Execute(`select str from mixer_test_proxy_conn where id = 1`); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if v, _ := r.GetString(0, 0); v != `123` {
-// 			t.Fatal(v)
-// 		}
-// 	}
-// }
+	if r, err := c.Execute(`select str from mixer_test_proxy_conn where id = 1`); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetString(0, 0); v != `123` {
+			t.Fatal(v)
+		}
+	}
+}
 
 // func TestConn_Replace(t *testing.T) {
 // 	s := `replace into mixer_test_proxy_conn (id, str, f) values(1, "abc", 3.14159)`
@@ -176,116 +176,116 @@ func TestConn_Insert(t *testing.T) {
 // 	}
 // }
 
-// func TestConn_Delete(t *testing.T) {
-// 	s := `delete from mixer_test_proxy_conn where id = 2`
+func TestConn_Delete(t *testing.T) {
+	s := `delete from mixer_test_proxy_conn where id = 100000`
 
-// 	c := newTestDBConn()
-// 	defer c.Close()
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	if r, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.AffectedRows != 1 {
-// 			t.Fatal(r.AffectedRows)
-// 		}
-// 	}
-// }
+	if r, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.AffectedRows != 0 {
+			t.Fatal(r.AffectedRows)
+		}
+	}
+}
 
-// func TestConn_SetAutoCommit(t *testing.T) {
-// 	c := newTestDBConn()
-// 	defer c.Close()
+func TestConn_SetAutoCommit(t *testing.T) {
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	// if r, err := c.Execute("set autocommit = 1"); err != nil {
-// 	//  t.Fatal(err)
-// 	// } else {
-// 	//  if !(r.Status&SERVER_STATUS_AUTOCOMMIT > 0) {
-// 	//      t.Fatal(r.Status)
-// 	//  }
-// 	// }
+	// if r, err := c.Execute("set autocommit = 1"); err != nil {
+	//  t.Fatal(err)
+	// } else {
+	//  if !(r.Status&SERVER_STATUS_AUTOCOMMIT > 0) {
+	//      t.Fatal(r.Status)
+	//  }
+	// }
 
-// 	if r, err := c.Execute("set autocommit = 0"); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if !(r.Status&SERVER_STATUS_AUTOCOMMIT == 0) {
-// 			t.Fatal(r.Status)
-// 		}
-// 	}
+	if r, err := c.Execute("set autocommit = 0"); err != nil {
+		t.Fatal(err)
+	} else {
+		if !(r.Status&SERVER_STATUS_AUTOCOMMIT == 0) {
+			t.Fatal(r.Status)
+		}
+	}
 
-// 	if r, err := c.Execute("select 1"); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if !(r.Status&SERVER_STATUS_AUTOCOMMIT > 0) {
-// 			t.Fatal(r.Status)
-// 		}
-// 	}
-// }
+	// if r, err := c.Execute("select 1"); err != nil {
+	// 	t.Fatal(err)
+	// } else {
+	// 	if !(r.Status&SERVER_STATUS_AUTOCOMMIT > 0) {
+	// 		t.Fatal(r.Status)
+	// 	}
+	// }
+}
 
-// func TestConn_Trans(t *testing.T) {
-// 	c1 := newTestDBConn()
-// 	defer c1.Close()
+func TestConn_Trans(t *testing.T) {
+	c1 := newTestDBConn()
+	defer c1.Close()
 
-// 	c2 := newTestDBConn()
-// 	defer c2.Close()
+	c2 := newTestDBConn()
+	defer c2.Close()
 
-// 	var err error
+	var err error
 
-// 	if err = c1.Begin(); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if err = c1.Begin(); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if err = c2.Begin(); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if err = c2.Begin(); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if _, err := c1.Execute(`insert into mixer_test_proxy_conn (id, str) values (111, "abc")`); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if _, err := c1.Execute(`insert into mixer_test_proxy_conn (id, str) values (111, "abc")`); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if r, err := c2.Execute(`select str from mixer_test_proxy_conn where id = 111`); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.RowNumber() != 0 {
-// 			t.Fatal(r.RowNumber())
-// 		}
-// 	}
+	if r, err := c2.Execute(`select str from mixer_test_proxy_conn where id = 111`); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.RowNumber() != 0 {
+			t.Fatal(r.RowNumber())
+		}
+	}
 
-// 	if err := c1.Commit(); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if err := c1.Commit(); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if err := c2.Commit(); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if err := c2.Commit(); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if r, err := c1.Execute(`select str from mixer_test_proxy_conn where id = 111`); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.RowNumber() != 1 {
-// 			t.Fatal(r.RowNumber())
-// 		}
+	if r, err := c1.Execute(`select str from mixer_test_proxy_conn where id = 111`); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.RowNumber() != 1 {
+			t.Fatal(r.RowNumber())
+		}
 
-// 		if v, _ := r.GetString(0, 0); v != `abc` {
-// 			t.Fatal(v)
-// 		}
-// 	}
-// }
+		if v, _ := r.GetString(0, 0); v != `abc` {
+			t.Fatal(v)
+		}
+	}
+}
 
-// func TestConn_SetNames(t *testing.T) {
-// 	c := newTestDBConn()
-// 	defer c.Close()
+func TestConn_SetNames(t *testing.T) {
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	if err := c.SetCharset("gb2312"); err != nil {
-// 		t.Fatal(err)
-// 	}
+	if err := c.SetCharset("gb2312"); err != nil {
+		t.Fatal(err)
+	}
 
-// 	if r, err := c.Execute("select 1 + 1"); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if v, _ := r.GetInt(0, 0); v != 2 {
-// 			t.Fatal(v)
-// 		}
-// 	}
-// }
+	if r, err := c.Execute("select 1 + 1"); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetInt(0, 0); v != 2 {
+			t.Fatal(v)
+		}
+	}
+}
 
 // func TestConn_LastInsertId(t *testing.T) {
 //     s := `CREATE TABLE IF NOT EXISTS mixer_test_conn_id (

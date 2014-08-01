@@ -47,7 +47,7 @@ func (c *Conn) handleSetAutoCommit(val sqlparser.ValExpr) error {
 func (c *Conn) handleSetNames(val sqlparser.ValExpr) error {
 	value, ok := val.(sqlparser.StrVal)
 	if !ok {
-		return fmt.Errorf("set names = charset only supports now")
+		return fmt.Errorf("set names charset only supports now")
 	}
 
 	charset := strings.ToLower(string(value))

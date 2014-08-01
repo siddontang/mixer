@@ -87,6 +87,9 @@ var (
 // Transaction Tokens
 %token <empty> BEGIN COMMIT ROLLBACK
 
+// Charset Tokens
+%token <empty> NAMES 
+
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
 %token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING
@@ -962,6 +965,10 @@ update_expression:
   {
     $$ = &UpdateExpr{Name: $1, Expr: $3} 
   }
+| NAMES value_expression
+  {
+    $$ = &UpdateExpr{Name: &ColName{Name: []byte("names")}, Expr: $2}   
+  } 
 
 exists_opt:
   { $$ = struct{}{} }

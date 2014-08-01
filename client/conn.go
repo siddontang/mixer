@@ -339,6 +339,10 @@ func (c *Conn) UseDB(dbName string) error {
 		return err
 	}
 
+	if _, err := c.readOK(); err != nil {
+		return err
+	}
+
 	c.db = dbName
 	return nil
 }

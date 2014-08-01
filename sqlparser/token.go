@@ -108,6 +108,8 @@ var keywords = map[string]int{
 	"begin":    BEGIN,
 	"rollback": ROLLBACK,
 	"commit":   COMMIT,
+
+	"names": NAMES,
 }
 
 // Lex returns the next token form the Tokenizer.
