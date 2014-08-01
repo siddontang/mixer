@@ -2,18 +2,17 @@ package client
 
 import (
 	"container/list"
-	"encoding/json"
 	. "github.com/siddontang/mixer/mysql"
 
 	"sync"
 )
 
 type Config struct {
-	Addr      string `json:"addr"`
-	User      string `json:"user"`
-	Password  string `json:"password"`
-	DB        string `json:"db"`
-	IdleConns int    `json:"idle_conns"`
+	Addr      string
+	User      string
+	Password  string
+	DB        string
+	IdleConns int
 }
 
 type DB struct {
@@ -21,17 +20,6 @@ type DB struct {
 
 	cfg   *Config
 	conns *list.List
-}
-
-func NewDB(jsonConfig json.RawMessage) (*DB, error) {
-	cfg := new(Config)
-
-	err := json.Unmarshal(jsonConfig, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return Open(cfg)
 }
 
 func Open(cfg *Config) (*DB, error) {
@@ -178,11 +166,6 @@ type SqlConn struct {
 
 func (p *SqlConn) Close() {
 	p.db.PushConn(p.Conn, nil)
-}
-
-func NewSqlConn(db *DB) (*SqlConn, error) {
-	c, err := db.PopConn()
-	return &SqlConn{c, db}, err
 }
 
 func (db *DB) GetConn() (*SqlConn, error) {

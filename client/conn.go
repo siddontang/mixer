@@ -347,7 +347,7 @@ func (c *Conn) GetDB() string {
 	return c.db
 }
 
-func (c *Conn) Exec(command string, args ...interface{}) (*Result, error) {
+func (c *Conn) Execute(command string, args ...interface{}) (*Result, error) {
 	if len(args) == 0 {
 		return c.exec(command)
 	} else {
@@ -355,40 +355,11 @@ func (c *Conn) Exec(command string, args ...interface{}) (*Result, error) {
 			return nil, err
 		} else {
 			var r *Result
-			r, err = s.Exec(args...)
+			r, err = s.Execute(args...)
 			s.Close()
 			return r, err
 		}
 	}
-
-	return nil, nil
-}
-
-func (c *Conn) RawQuery(command string, args ...interface{}) (*ResultsetData, error) {
-	if len(args) == 0 {
-		if err := c.writeCommandStr(COM_QUERY, command); err != nil {
-			return nil, err
-		}
-		return c.readResult(false)
-	} else {
-		if s, err := c.Prepare(command); err != nil {
-			return nil, err
-		} else {
-			var r *ResultsetData
-			r, err = s.RawQuery(args...)
-			s.Close()
-			return r, err
-		}
-	}
-}
-
-func (c *Conn) Query(command string, args ...interface{}) (*Resultset, error) {
-	r, err := c.RawQuery(command, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Parse()
 }
 
 func (c *Conn) Begin() error {
@@ -425,55 +396,22 @@ func (c *Conn) SetCharset(charset string) error {
 	}
 }
 
-func (c *Conn) FieldList(table, fieldWildcard string) ([]FieldData, error) {
-	if err := c.writeCommandStrStr(COM_FIELD_LIST, table, fieldWildcard); err != nil {
-		return nil, err
-	}
-
-	data, err := c.readPacket()
-	if err != nil {
-		return nil, err
-	}
-
-	columns := make([]FieldData, 0)
-
-	if data[0] == ERR_HEADER {
-		return nil, c.handleErrorPacket(data)
-	} else if data[0] == EOF_HEADER && len(data) <= 5 {
-		return []FieldData{}, nil
-	}
-
-	columns = append(columns, data)
-
-	for {
-		data, err = c.readPacket()
-		if err != nil {
-			return nil, err
-		}
-
-		// EOF Packet
-		if data[0] == EOF_HEADER && len(data) <= 5 {
-			break
-		}
-
-		columns = append(columns, data)
-	}
-
-	return columns, nil
-}
-
 func (c *Conn) exec(query string) (*Result, error) {
 	if err := c.writeCommandStr(COM_QUERY, query); err != nil {
 		return nil, err
 	}
 
-	return c.readOK()
+	return c.readResult(false)
 }
 
-func (c *Conn) readResultset(data []byte, binary bool) (*ResultsetData, error) {
-	result := new(ResultsetData)
+func (c *Conn) readResultset(data []byte, binary bool) (*Result, error) {
+	result := &Result{
+		Status:       0,
+		InsertId:     0,
+		AffectedRows: 0,
 
-	result.Binary = binary
+		Resultset: &Resultset{},
+	}
 
 	// column count
 	count, _, n := LengthEncodedInt(data)
@@ -482,21 +420,21 @@ func (c *Conn) readResultset(data []byte, binary bool) (*ResultsetData, error) {
 		return nil, ErrMalformPacket
 	}
 
-	result.FieldDatas = make([]FieldData, count)
-	result.RowDatas = make([]RowData, 0)
+	result.Fields = make([]*Field, count)
+	result.FieldNames = make(map[string]int, count)
 
 	if err := c.readResultColumns(result); err != nil {
 		return nil, err
 	}
 
-	if err := c.readResultRows(result); err != nil {
+	if err := c.readResultRows(result, binary); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
 
-func (c *Conn) readResultColumns(result *ResultsetData) (err error) {
+func (c *Conn) readResultColumns(result *Result) (err error) {
 	var i int = 0
 	var data []byte
 
@@ -515,20 +453,25 @@ func (c *Conn) readResultColumns(result *ResultsetData) (err error) {
 				c.status = result.Status
 			}
 
-			if i != len(result.FieldDatas) {
+			if i != len(result.Fields) {
 				err = ErrMalformPacket
 			}
 
 			return
 		}
 
-		result.FieldDatas[i] = data
+		result.Fields[i], err = FieldData(data).Parse()
+		if err != nil {
+			return
+		}
+
+		result.FieldNames[string(result.Fields[i].Name)] = i
 
 		i++
 	}
 }
 
-func (c *Conn) readResultRows(result *ResultsetData) (err error) {
+func (c *Conn) readResultRows(result *Result, isBinary bool) (err error) {
 	var data []byte
 
 	for {
@@ -547,11 +490,23 @@ func (c *Conn) readResultRows(result *ResultsetData) (err error) {
 				c.status = result.Status
 			}
 
-			return
+			break
 		}
 
 		result.RowDatas = append(result.RowDatas, data)
 	}
+
+	result.Values = make([][]interface{}, len(result.RowDatas))
+
+	for i := range result.Values {
+		result.Values[i], err = result.RowDatas[i].Parse(result.Fields, isBinary)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *Conn) readUntilEOF() (err error) {
@@ -640,14 +595,14 @@ func (c *Conn) readOK() (*Result, error) {
 	}
 }
 
-func (c *Conn) readResult(binary bool) (*ResultsetData, error) {
+func (c *Conn) readResult(binary bool) (*Result, error) {
 	data, err := c.readPacket()
 	if err != nil {
 		return nil, err
 	}
 
 	if data[0] == OK_HEADER {
-		return nil, ErrMalformPacket
+		return c.handleOKPacket(data)
 	} else if data[0] == ERR_HEADER {
 		return nil, c.handleErrorPacket(data)
 	} else if data[0] == LocalInFile_HEADER {

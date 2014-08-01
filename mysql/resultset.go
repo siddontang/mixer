@@ -216,49 +216,7 @@ func (p RowData) ParseBinary(f []*Field) ([]interface{}, error) {
 	return data, nil
 }
 
-type ResultsetData struct {
-	Binary bool
-
-	Status     uint16
-	FieldDatas []FieldData
-	RowDatas   []RowData
-}
-
-func (d *ResultsetData) Parse() (*Resultset, error) {
-	r := new(Resultset)
-
-	r.Status = d.Status
-	r.Fields = make([]*Field, len(d.FieldDatas))
-	r.FieldNames = make(map[string]int, len(d.FieldDatas))
-
-	var err error
-	for i := range r.Fields {
-		r.Fields[i], err = d.FieldDatas[i].Parse()
-		if err != nil {
-			return nil, err
-		}
-
-		r.FieldNames[string(r.Fields[i].Name)] = i
-	}
-
-	r.Values = make([][]interface{}, len(d.RowDatas))
-	r.RowDatas = make([]RowData, len(d.RowDatas))
-
-	for i := range r.Values {
-		r.Values[i], err = d.RowDatas[i].Parse(r.Fields, d.Binary)
-
-		if err != nil {
-			return nil, err
-		}
-
-		r.RowDatas[i] = d.RowDatas[i]
-	}
-
-	return r, nil
-}
-
 type Resultset struct {
-	Status     uint16
 	Fields     []*Field
 	FieldNames map[string]int
 	Values     [][]interface{}

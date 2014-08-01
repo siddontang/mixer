@@ -19,6 +19,8 @@ func (s *Server) parseSchemas() error {
 		return err
 	}
 
+	s.schemas = make(map[string]*Schema)
+
 	for _, v := range s.cfg.Schemas {
 		if _, ok := s.schemas[v.DB]; ok {
 			return fmt.Errorf("duplicate schema %s", v.DB)

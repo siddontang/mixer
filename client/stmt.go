@@ -24,29 +24,12 @@ func (s *Stmt) ColumnNum() int {
 	return s.columns
 }
 
-func (s *Stmt) Exec(args ...interface{}) (*Result, error) {
-	if err := s.write(args...); err != nil {
-		return nil, err
-	}
-
-	return s.conn.readOK()
-}
-
-func (s *Stmt) RawQuery(args ...interface{}) (*ResultsetData, error) {
+func (s *Stmt) Execute(args ...interface{}) (*Result, error) {
 	if err := s.write(args...); err != nil {
 		return nil, err
 	}
 
 	return s.conn.readResult(true)
-}
-
-func (s *Stmt) Query(args ...interface{}) (*Resultset, error) {
-	r, err := s.RawQuery(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Parse()
 }
 
 func (s *Stmt) Close() error {

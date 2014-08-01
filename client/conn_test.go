@@ -34,7 +34,7 @@ func TestConn_DeleteTable(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if _, err := c.Exec("drop table if exists mixer_test_conn"); err != nil {
+	if _, err := c.Execute("drop table if exists mixer_test_conn"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -53,7 +53,7 @@ func TestConn_CreateTable(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if _, err := c.Exec(s); err != nil {
+	if _, err := c.Execute(s); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -64,7 +64,7 @@ func TestConn_Insert(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if pkg, err := c.Exec(s); err != nil {
+	if pkg, err := c.Execute(s); err != nil {
 		t.Fatal(err)
 	} else {
 		if pkg.AffectedRows != 1 {
@@ -79,7 +79,7 @@ func TestConn_Select(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if result, err := c.Query(s); err != nil {
+	if result, err := c.Execute(s); err != nil {
 		t.Fatal(err)
 	} else {
 		if len(result.Fields) != 3 {
@@ -117,28 +117,6 @@ func TestConn_Select(t *testing.T) {
 	}
 }
 
-func TestConn_FieldList(t *testing.T) {
-	c := newTestConn()
-	defer c.Close()
-
-	if r, err := c.FieldList("mixer_test_conn", "st%"); err != nil {
-		t.Fatal(err)
-	} else {
-		if len(r) != 1 {
-			t.Fatal(len(r))
-		}
-
-		result, err := r[0].Parse()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if string(result.Name) != `str` {
-			t.Fatal(string(result.Name))
-		}
-	}
-}
-
 func TestConn_Escape(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
@@ -147,13 +125,13 @@ func TestConn_Escape(t *testing.T) {
 	s := fmt.Sprintf(`insert into mixer_test_conn (id, str) values(5, "%s")`,
 		Escape(e))
 
-	if _, err := c.Exec(s); err != nil {
+	if _, err := c.Execute(s); err != nil {
 		t.Fatal(err)
 	}
 
 	s = `select str from mixer_test_conn where id = ?`
 
-	if r, err := c.Query(s, 5); err != nil {
+	if r, err := c.Execute(s, 5); err != nil {
 		t.Fatal(err)
 	} else {
 		str, _ := r.GetString(0, 0)

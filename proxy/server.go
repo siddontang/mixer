@@ -78,6 +78,7 @@ func (s *Server) Close() {
 }
 
 func (s *Server) onConn(c net.Conn) {
+	conn := s.newConn(c)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -87,6 +88,15 @@ func (s *Server) onConn(c net.Conn) {
 			log.Error("onConn panic %v: %v\n%s", c.RemoteAddr().String(), err, buf)
 		}
 
+		conn.Close()
 	}()
+
+	if err := conn.Handshake(); err != nil {
+		log.Error("handshake error %s", err.Error())
+		c.Close()
+		return
+	}
+
+	conn.Run()
 
 }

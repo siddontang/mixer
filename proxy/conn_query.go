@@ -5,6 +5,7 @@ import (
 	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	"github.com/siddontang/mixer/sqlparser"
+	"sync"
 )
 
 func (c *Conn) handleQuery(sql string) (err error) {
@@ -109,10 +110,10 @@ func (c *Conn) getConn(n *Node, isSelect bool) (co *client.SqlConn, err error) {
 	return
 }
 
-func (c *Conn) handleSelect(sql string, stmt sqlparser.Statement) error {
+func (c *Conn) getShardConns(stmt sqlparser.Statement) ([]*client.SqlConn, error) {
 	nodes, err := c.getShardList(stmt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	conns := make([]*client.SqlConn, 0, len(nodes))
@@ -127,12 +128,221 @@ func (c *Conn) handleSelect(sql string, stmt sqlparser.Statement) error {
 		conns = append(conns, co)
 	}
 
+	return conns, err
+}
+
+func (c *Conn) executeInShard(conns []*client.SqlConn, sql string) ([]*Result, error) {
+	var wg sync.WaitGroup
+	wg.Add(len(conns))
+
+	rs := make([]interface{}, len(conns))
+
+	f := func(rs []interface{}, i int, co *client.SqlConn) {
+		r, err := co.Execute(sql)
+		if err != nil {
+			rs[i] = err
+		} else {
+			rs[i] = r
+		}
+
+		wg.Done()
+	}
+
+	for i, co := range conns {
+		go f(rs, i, co)
+	}
+
+	wg.Wait()
+
+	var err error
+	r := make([]*Result, len(conns))
+	for i, v := range rs {
+		if e, ok := v.(error); ok {
+			err = e
+			break
+		}
+		r[i] = rs[i].(*Result)
+	}
+
+	return r, err
+}
+
+func (c *Conn) closeShardConns(conns []*client.SqlConn, rollback bool) {
+	if c.isInTransaction() {
+		return
+	}
+
+	for _, co := range conns {
+		if rollback {
+			co.Rollback()
+		}
+
+		co.Close()
+	}
+}
+
+func (c *Conn) handleSelect(sql string, stmt sqlparser.Statement) error {
+	conns, err := c.getShardConns(stmt)
+	if err != nil {
+		return err
+	}
+
+	var rs []*Result
+
+	rs, err = c.executeInShard(conns, sql)
+
+	c.closeShardConns(conns, false)
+
+	if err == nil {
+		err = c.mergeSelectResult(rs, stmt.(*sqlparser.Select))
+	}
+
+	return err
+}
+
+func (c *Conn) beginShardConns(conns []*client.SqlConn) error {
+	if c.isInTransaction() {
+		return nil
+	}
+
+	for _, co := range conns {
+		if err := co.Begin(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Conn) commitShardConns(conns []*client.SqlConn) error {
+	if c.isInTransaction() {
+		return nil
+	}
+
+	for _, co := range conns {
+		if err := co.Commit(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (c *Conn) handleExec(sql string, stmt sqlparser.Statement) error {
-	if !c.isInTransaction() {
+	conns, err := c.getShardConns(stmt)
+	if err != nil {
+		return err
+	}
 
+	var rs []*Result
+
+	if len(conns) == 1 {
+		rs, err = c.executeInShard(conns, sql)
+	} else {
+		//for multi nodes, 2PC simple, begin, exec, commit
+		//if commit error, data maybe corrupt
+		for {
+			if err = c.beginShardConns(conns); err != nil {
+				break
+			}
+
+			if rs, err = c.executeInShard(conns, sql); err != nil {
+				break
+			}
+
+			err = c.commitShardConns(conns)
+			break
+		}
+	}
+
+	c.closeShardConns(conns, err != nil)
+
+	if err == nil {
+		err = c.mergeExecResult(rs)
+	}
+
+	return err
+}
+
+func (c *Conn) mergeExecResult(rs []*Result) error {
+	r := new(Result)
+
+	for _, v := range rs {
+		r.Status |= v.Status
+		r.AffectedRows += v.AffectedRows
+		if r.InsertId == 0 {
+			r.InsertId = v.InsertId
+		} else if r.InsertId > v.InsertId {
+			//last insert id is first gen id for multi row inserted
+			//see http://dev.mysql.com/doc/refman/5.6/en/information-functions.html#function_last-insert-id
+			r.InsertId = v.InsertId
+		}
+	}
+
+	if r.InsertId > 0 {
+		c.lastInsertId = int64(r.InsertId)
+	}
+
+	c.affectedRows = int64(r.AffectedRows)
+
+	return c.writeOK(r)
+}
+
+func (c *Conn) mergeSelectResult(rs []*Result, stmt *sqlparser.Select) error {
+	r := rs[0].Resultset
+
+	status := c.status | rs[0].Status
+
+	for i := 1; i < len(rs); i++ {
+		status |= rs[i].Status
+
+		//check fields equal
+
+		for j := range rs[i].Values {
+			r.Values = append(r.Values, rs[i].Values[j])
+			r.RowDatas = append(r.RowDatas, rs[i].RowDatas[j])
+		}
+	}
+
+	//to do order by, group by, limit offset
+
+	return c.writeResultset(0, r)
+}
+
+func (c *Conn) writeResultset(status uint16, r *Resultset) error {
+	c.affectedRows = int64(-1)
+
+	columnLen := PutLengthEncodedInt(uint64(len(r.Fields)))
+
+	data := make([]byte, 4, 1024)
+
+	data = append(data, columnLen...)
+	if err := c.writePacket(data); err != nil {
+		return err
+	}
+
+	for _, v := range r.Fields {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		if err := c.writePacket(data); err != nil {
+			return err
+		}
+	}
+
+	if err := c.writeEOF(status); err != nil {
+		return err
+	}
+
+	for _, v := range r.RowDatas {
+		data = data[0:4]
+		data = append(data, v...)
+		if err := c.writePacket(data); err != nil {
+			return err
+		}
+	}
+
+	if err := c.writeEOF(status); err != nil {
+		return err
 	}
 
 	return nil

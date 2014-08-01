@@ -14,7 +14,7 @@ func TestStmt_DropTable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(); err != nil {
+	if _, err := s.Execute(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +41,7 @@ func TestStmt_CreateTable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = s.Exec(); err != nil {
+	if _, err = s.Execute(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +60,7 @@ func TestStmt_Delete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(); err != nil {
+	if _, err := s.Execute(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,7 +79,7 @@ func TestStmt_Insert(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pkg, err := s.Exec(1, "a", 3.14, "test1", 255, -127); err != nil {
+	if pkg, err := s.Execute(1, "a", 3.14, "test1", 255, -127); err != nil {
 		t.Fatal(err)
 	} else {
 		if pkg.AffectedRows != 1 {
@@ -101,7 +101,7 @@ func TestStmt_Select(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if result, err := s.Query(1); err != nil {
+	if result, err := s.Execute(1); err != nil {
 		t.Fatal(err)
 	} else {
 		if len(result.Values) != 1 {
@@ -153,7 +153,7 @@ func TestStmt_NULL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pkg, err := s.Exec(2, nil, 3.14, nil); err != nil {
+	if pkg, err := s.Execute(2, nil, 3.14, nil); err != nil {
 		t.Fatal(err)
 	} else {
 		if pkg.AffectedRows != 1 {
@@ -170,7 +170,7 @@ func TestStmt_NULL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r, err := s.Query(2); err != nil {
+	if r, err := s.Execute(2); err != nil {
 		t.Fatal(err)
 	} else {
 		if b, err := r.IsNullByName(0, "id"); err != nil {
@@ -213,7 +213,7 @@ func TestStmt_Unsigned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pkg, err := s.Exec(3, uint8(255)); err != nil {
+	if pkg, err := s.Execute(3, uint8(255)); err != nil {
 		t.Fatal(err)
 	} else {
 		if pkg.AffectedRows != 1 {
@@ -230,7 +230,7 @@ func TestStmt_Unsigned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r, err := s.Query(3); err != nil {
+	if r, err := s.Execute(3); err != nil {
 		t.Fatal(err)
 	} else {
 		if u, err := r.GetUint(0, 0); err != nil {
@@ -255,11 +255,11 @@ func TestStmt_Signed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(4, 127); err != nil {
+	if _, err := s.Execute(4, 127); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Exec(uint64(18446744073709551516), int8(-128)); err != nil {
+	if _, err := s.Execute(uint64(18446744073709551516), int8(-128)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,7 +271,7 @@ func TestStmt_Trans(t *testing.T) {
 	c := newTestConn()
 	defer c.Close()
 
-	if _, err := c.Exec(`insert into mixer_test_stmt (id, str) values (1002, "abc")`); err != nil {
+	if _, err := c.Execute(`insert into mixer_test_stmt (id, str) values (1002, "abc")`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -286,7 +286,7 @@ func TestStmt_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := s.Query(1002); err != nil {
+	if _, err := s.Execute(1002); err != nil {
 		t.Fatal(err)
 	}
 
@@ -294,7 +294,7 @@ func TestStmt_Trans(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r, err := s.Query(1002); err != nil {
+	if r, err := s.Execute(1002); err != nil {
 		t.Fatal(err)
 	} else {
 		if str, _ := r.GetString(0, 0); str != `abc` {

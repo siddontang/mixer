@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
-var testConfigData = []byte(
-	`
+func TestConfig(t *testing.T) {
+	var testConfigData = []byte(
+		`
 addr : 127.0.0.1:4000
 user : root
 password : 
@@ -54,7 +55,6 @@ rules:
     type: default
 `)
 
-func TestConfig(t *testing.T) {
 	cfg, err := ParseConfigData(testConfigData)
 	if err != nil {
 		t.Fatal(err)
