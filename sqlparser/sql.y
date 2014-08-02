@@ -90,6 +90,9 @@ var (
 // Charset Tokens
 %token <empty> NAMES 
 
+// Replace
+%token <empty> REPLACE
+
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
 %token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING
@@ -146,6 +149,7 @@ var (
 %type <empty> force_eof
 
 %type <statement> begin_statement commit_statement rollback_statement
+%type <statement> replace_statement
 
 %%
 
@@ -171,6 +175,7 @@ command:
 | begin_statement
 | commit_statement
 | rollback_statement
+| replace_statement
 
 select_statement:
   SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt
@@ -199,6 +204,23 @@ insert_statement:
     $$ = &Insert{Comments: Comments($2), Table: $4, Columns: cols, Rows: Values{vals}, OnDup: OnDup($7)}
   }
 
+replace_statement:
+  REPLACE comment_opt INTO dml_table_expression column_list_opt row_list
+  {
+    $$ = &Replace{Comments: Comments($2), Table: $4, Columns: $5, Rows: $6}
+  }
+| REPLACE comment_opt INTO dml_table_expression SET update_list
+  {
+    cols := make(Columns, 0, len($6))
+    vals := make(ValTuple, 0, len($6))
+    for _, col := range $6 {
+      cols = append(cols, &NonStarExpr{Expr: col.Name})
+      vals = append(vals, col.Expr)
+    }
+    $$ = &Replace{Comments: Comments($2), Table: $4, Columns: cols, Rows: Values{vals}}
+  }
+
+
 update_statement:
   UPDATE comment_opt dml_table_expression SET update_list where_expression_opt order_by_opt limit_opt
   {
@@ -215,6 +237,10 @@ set_statement:
   SET comment_opt update_list
   {
     $$ = &Set{Comments: Comments($2), Exprs: $3}
+  }
+| SET NAMES value_expression 
+  {
+    $$ = &Set{Exprs: UpdateExprs{&UpdateExpr{Name: &ColName{Name:[]byte("names")}, Expr: $3}}}
   }
 
 begin_statement:
@@ -965,10 +991,6 @@ update_expression:
   {
     $$ = &UpdateExpr{Name: $1, Expr: $3} 
   }
-| NAMES value_expression
-  {
-    $$ = &UpdateExpr{Name: &ColName{Name: []byte("names")}, Expr: $2}   
-  } 
 
 exists_opt:
   { $$ = struct{}{} }

@@ -31,6 +31,8 @@ func (c *Conn) handleQuery(sql string) (err error) {
 		return c.handleExec(sql, stmt)
 	case *sqlparser.Delete:
 		return c.handleExec(sql, stmt)
+	case *sqlparser.Replace:
+		return c.handleExec(sql, stmt)
 	case *sqlparser.Set:
 		return c.handleSet(v)
 	case *sqlparser.Begin:

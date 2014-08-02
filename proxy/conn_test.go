@@ -129,52 +129,52 @@ func TestConn_Update(t *testing.T) {
 	}
 }
 
-// func TestConn_Replace(t *testing.T) {
-// 	s := `replace into mixer_test_proxy_conn (id, str, f) values(1, "abc", 3.14159)`
+func TestConn_Replace(t *testing.T) {
+	s := `replace into mixer_test_proxy_conn (id, str, f) values(1, "abc", 3.14159)`
 
-// 	c := newTestDBConn()
-// 	defer c.Close()
+	c := newTestDBConn()
+	defer c.Close()
 
-// 	if r, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.AffectedRows != 2 {
-// 			t.Fatal(r.AffectedRows)
-// 		}
-// 	}
+	if r, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.AffectedRows != 2 {
+			t.Fatal(r.AffectedRows)
+		}
+	}
 
-// 	s = `replace into mixer_test_proxy_conn (id, str) values(2, "abcb")`
+	s = `replace into mixer_test_proxy_conn (id, str) values(2, "abcb")`
 
-// 	if r, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if r.AffectedRows != 1 {
-// 			t.Fatal(r.AffectedRows)
-// 		}
-// 	}
+	if r, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if r.AffectedRows != 1 {
+			t.Fatal(r.AffectedRows)
+		}
+	}
 
-// 	s = `select str, f from mixer_test_proxy_conn`
+	s = `select str, f from mixer_test_proxy_conn`
 
-// 	if r, err := c.Execute(s); err != nil {
-// 		t.Fatal(err)
-// 	} else {
-// 		if v, _ := r.GetString(0, 0); v != `abc` {
-// 			t.Fatal(v)
-// 		}
+	if r, err := c.Execute(s); err != nil {
+		t.Fatal(err)
+	} else {
+		if v, _ := r.GetString(0, 0); v != `abc` {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetString(1, 0); v != `abcb` {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetString(1, 0); v != `abcb` {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.GetFloat(0, 1); v != 3.14159 {
-// 			t.Fatal(v)
-// 		}
+		if v, _ := r.GetFloat(0, 1); v != 3.14159 {
+			t.Fatal(v)
+		}
 
-// 		if v, _ := r.IsNull(1, 1); !v {
-// 			t.Fatal(v)
-// 		}
-// 	}
-// }
+		if v, _ := r.IsNull(1, 1); !v {
+			t.Fatal(v)
+		}
+	}
+}
 
 func TestConn_Delete(t *testing.T) {
 	s := `delete from mixer_test_proxy_conn where id = 100000`
@@ -278,13 +278,13 @@ func TestConn_SetNames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r, err := c.Execute("select 1 + 1"); err != nil {
-		t.Fatal(err)
-	} else {
-		if v, _ := r.GetInt(0, 0); v != 2 {
-			t.Fatal(v)
-		}
-	}
+	// if r, err := c.Execute("select 1 + 1"); err != nil {
+	// 	t.Fatal(err)
+	// } else {
+	// 	if v, _ := r.GetInt(0, 0); v != 2 {
+	// 		t.Fatal(v)
+	// 	}
+	// }
 }
 
 // func TestConn_LastInsertId(t *testing.T) {

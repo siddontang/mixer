@@ -111,17 +111,25 @@ func (plan *RoutingPlan) shardListFromPlan(bindVariables map[string]interface{})
 
 func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) {
 	plan = &RoutingPlan{}
-	if ins, ok := statement.(*Insert); ok {
-		if _, ok := ins.Rows.(SelectStatement); ok {
+	var where *Where
+	switch stmt := statement.(type) {
+	case *Insert:
+		if _, ok := stmt.Rows.(SelectStatement); ok {
 			panic(NewParserError("select in insert not allowed"))
 		}
 
-		plan.rule = r.GetRule(String(ins.Table))
-		plan.criteria = plan.routingAnalyzeValues(ins.Rows.(Values))
+		plan.rule = r.GetRule(String(stmt.Table))
+		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
 		return plan
-	}
-	var where *Where
-	switch stmt := statement.(type) {
+	case *Replace:
+		if _, ok := stmt.Rows.(SelectStatement); ok {
+			panic(NewParserError("select in replace not allowed"))
+		}
+
+		plan.rule = r.GetRule(String(stmt.Table))
+		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
+		return plan
+
 	case *Select:
 		plan.rule = r.GetRule(String(stmt.From[0]))
 		where = stmt.Where

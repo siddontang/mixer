@@ -109,7 +109,8 @@ var keywords = map[string]int{
 	"rollback": ROLLBACK,
 	"commit":   COMMIT,
 
-	"names": NAMES,
+	"names":   NAMES,
+	"replace": REPLACE,
 }
 
 // Lex returns the next token form the Tokenizer.
