@@ -45,7 +45,12 @@ func (c *Conn) handleSetAutoCommit(val sqlparser.ValExpr) error {
 }
 
 func (c *Conn) handleSetNames(val sqlparser.ValExpr) error {
-	charset := strings.ToLower(nstring(val))
+	value, ok := val.(sqlparser.StrVal)
+	if !ok {
+		return fmt.Errorf("set names charset error")
+	}
+
+	charset := strings.ToLower(string(value))
 	cid, ok := CharsetIds[charset]
 	if !ok {
 		return fmt.Errorf("invalid charset %s", charset)
