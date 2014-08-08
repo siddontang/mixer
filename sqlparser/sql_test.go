@@ -13,3 +13,12 @@ func TestSet(t *testing.T) {
 	}
 
 }
+
+func TestSimpleSelect(t *testing.T) {
+	sql := "select last_insert_id() as a"
+
+	_, err := Parse(sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

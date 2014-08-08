@@ -31,7 +31,6 @@ func (c *Conn) handleSetAutoCommit(val sqlparser.ValExpr) error {
 	if !ok {
 		return fmt.Errorf("set autocommit error")
 	}
-
 	switch value[0] {
 	case '1':
 		c.status |= SERVER_STATUS_AUTOCOMMIT

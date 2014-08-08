@@ -165,7 +165,10 @@ type SqlConn struct {
 }
 
 func (p *SqlConn) Close() {
-	p.db.PushConn(p.Conn, nil)
+	if p.Conn != nil {
+		p.db.PushConn(p.Conn, nil)
+		p.Conn = nil
+	}
 }
 
 func (db *DB) GetConn() (*SqlConn, error) {

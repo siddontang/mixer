@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/siddontang/go-log/log"
 	"github.com/siddontang/mixer/client"
+	"github.com/siddontang/mixer/hack"
 	. "github.com/siddontang/mixer/mysql"
 	"net"
 	"runtime"
@@ -263,11 +264,11 @@ func (c *Conn) dispatch(data []byte) error {
 
 	switch cmd {
 	case COM_QUERY:
-		return c.handleQuery(string(data))
+		return c.handleQuery(hack.String(data))
 	case COM_PING:
 		return c.writeOK(nil)
 	case COM_INIT_DB:
-		return c.useDB(string(data))
+		return c.useDB(hack.String(data))
 	// case COM_STMT_PREPARE:
 	// 	return c.handleStmtPrepare(data)
 	// case COM_STMT_EXECUTE:

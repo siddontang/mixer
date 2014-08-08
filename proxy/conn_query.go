@@ -5,6 +5,7 @@ import (
 	"github.com/siddontang/mixer/client"
 	. "github.com/siddontang/mixer/mysql"
 	"github.com/siddontang/mixer/sqlparser"
+	"strings"
 	"sync"
 )
 
@@ -15,6 +16,8 @@ func (c *Conn) handleQuery(sql string) (err error) {
 			return
 		}
 	}()
+
+	sql = strings.TrimRight(sql, ";")
 
 	var stmt sqlparser.Statement
 	stmt, err = sqlparser.Parse(sql)
@@ -41,6 +44,8 @@ func (c *Conn) handleQuery(sql string) (err error) {
 		return c.handleCommit()
 	case *sqlparser.Rollback:
 		return c.handleRollback()
+	case *sqlparser.SimpleSelect:
+		return c.handleSimpleSelect(sql, v)
 	default:
 		return fmt.Errorf("statement %T not support now", stmt)
 	}
