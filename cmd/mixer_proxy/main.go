@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-var configFile = flag.String("config", "/etc/mixer.yaml", "mixer proxy config file")
+var configFile = flag.String("config", "/etc/mixer.conf", "mixer proxy config file")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())

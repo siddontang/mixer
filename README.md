@@ -7,11 +7,14 @@ Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using M
 - Supports base MySQL 
 - Splits read and write.
 - MySQL HA, switchs backup automatically if main crashed
+- Base SQL Routing
 
 ## Todo
 
-- Routes SQL to multi MySQL server with specified rule.
+- Enhance Routing Rule.
+- SQL validation check. 
 - Statistics.
+- Prepare statement.
 
 ## Install 
 
@@ -31,9 +34,6 @@ Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using M
 
 Add later......
  
-## Doc
-
-[My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877)
 
 ## Feedback
 
