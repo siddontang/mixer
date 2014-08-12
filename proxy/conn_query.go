@@ -46,6 +46,8 @@ func (c *Conn) handleQuery(sql string) (err error) {
 		return c.handleRollback()
 	case *sqlparser.SimpleSelect:
 		return c.handleSimpleSelect(sql, v)
+	case *sqlparser.Admin:
+		return c.handleAdmin(v)
 	default:
 		return fmt.Errorf("statement %T not support now", stmt)
 	}

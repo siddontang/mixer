@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+const (
+	Master       = "master"
+	MasterBackup = "master_backup"
+	Slave        = "slave"
+)
+
 type Node struct {
 	sync.Mutex
 

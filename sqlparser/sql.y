@@ -93,6 +93,9 @@ var (
 // Replace
 %token <empty> REPLACE
 
+// Mixer admin
+%token <empty> ADMIN
+
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
 %token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING
@@ -150,6 +153,7 @@ var (
 
 %type <statement> begin_statement commit_statement rollback_statement
 %type <statement> replace_statement
+%type <statement> admin_statement
 
 %%
 
@@ -176,6 +180,7 @@ command:
 | commit_statement
 | rollback_statement
 | replace_statement
+| admin_statement
 
 select_statement:
   SELECT comment_opt distinct_opt select_expression_list
@@ -263,6 +268,12 @@ rollback_statement:
   ROLLBACK
   {
     $$ = &Rollback{}
+  }
+
+admin_statement:
+  ADMIN sql_id '(' value_expression_list ')'
+  {
+    $$ = &Admin{Name : $2, Values : $4}
   }
 
 create_statement:

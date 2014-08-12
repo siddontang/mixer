@@ -912,3 +912,14 @@ func (node *SimpleSelect) Format(buf *TrackedBuffer) {
 func (*SimpleSelect) IStatement()       {}
 func (*SimpleSelect) ISelectStatement() {}
 func (*SimpleSelect) IInsertRows()      {}
+
+type Admin struct {
+	Name   []byte
+	Values ValExprs
+}
+
+func (*Admin) IStatement() {}
+
+func (node *Admin) Format(buf *TrackedBuffer) {
+	buf.Fprintf("admin %s(%v)", node.Name, node.Values)
+}

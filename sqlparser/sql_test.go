@@ -22,3 +22,13 @@ func TestSimpleSelect(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAdmin(t *testing.T) {
+	sql := `admin upnode("node1", "master", "127.0.0.1")`
+
+	_, err := Parse(sql)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+}

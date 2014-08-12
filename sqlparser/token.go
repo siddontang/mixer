@@ -111,6 +111,9 @@ var keywords = map[string]int{
 
 	"names":   NAMES,
 	"replace": REPLACE,
+
+	//for mixer admin
+	"admin": ADMIN,
 }
 
 // Lex returns the next token form the Tokenizer.
