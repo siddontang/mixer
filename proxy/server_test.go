@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"github.com/siddontang/mixer/client"
+	"github.com/siddontang/mixer/config"
 	"sync"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ rules:
 
 func newTestServer() *Server {
 	f := func() {
-		cfg, err := ParseConfigData(testConfigData)
+		cfg, err := config.ParseConfigData(testConfigData)
 		if err != nil {
 			println(err.Error())
 			panic(err)
@@ -70,19 +71,15 @@ func newTestDB() *client.DB {
 	newTestServer()
 
 	f := func() {
-		cfg := new(client.Config)
-		cfg.Addr = "127.0.0.1:4000"
-		cfg.User = "root"
-		cfg.DB = "mixer"
-		cfg.IdleConns = 4
-
 		var err error
-		testDB, err = client.Open(cfg)
+		testDB, err = client.Open("127.0.0.1:4000", "root", "", "mixer")
 
 		if err != nil {
 			println(err.Error())
 			panic(err)
 		}
+
+		testDB.SetIdleConns(4)
 	}
 
 	testDBOnce.Do(f)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/siddontang/mixer/config"
 	"github.com/siddontang/mixer/proxy"
 	"os"
 	"os/signal"
@@ -21,7 +22,7 @@ func main() {
 		return
 	}
 
-	cfg, err := proxy.ParseConfigFile(*configFile)
+	cfg, err := config.ParseConfigFile(*configFile)
 	if err != nil {
 		println(err.Error())
 		return

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/siddontang/go-log/log"
 	"github.com/siddontang/mixer/client"
+	"github.com/siddontang/mixer/config"
 	"sync"
 	"time"
 )
@@ -13,7 +14,7 @@ type Node struct {
 
 	server *Server
 
-	cfg NodeConfig
+	cfg config.NodeConfig
 
 	//running master db
 	db *client.DB
@@ -126,13 +127,13 @@ func (n *Node) checkSlave() {
 }
 
 func (n *Node) openDB(addr string) (*client.DB, error) {
-	cfg := new(client.Config)
-	cfg.Addr = addr
-	cfg.IdleConns = n.cfg.IdleConns
-	cfg.User = n.cfg.User
-	cfg.Password = n.cfg.Password
+	db, err := client.Open(addr, n.cfg.User, n.cfg.Password, "")
+	if err != nil {
+		return nil, err
+	}
 
-	return client.Open(cfg)
+	db.SetIdleConns(n.cfg.IdleConns)
+	return db, nil
 }
 
 func (n *Node) checkUpDB(addr string) (*client.DB, error) {
@@ -332,7 +333,7 @@ func (s *Server) parseNodes() error {
 	return nil
 }
 
-func (s *Server) parseNode(cfg NodeConfig) (*Node, error) {
+func (s *Server) parseNode(cfg config.NodeConfig) (*Node, error) {
 	n := new(Node)
 	n.server = s
 	n.cfg = cfg

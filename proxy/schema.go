@@ -14,7 +14,7 @@ type Schema struct {
 }
 
 func (s *Server) parseSchemas() error {
-	r, err := router.NewRouter(s.cfg.NewRouterConfig())
+	r, err := router.NewRouter(s.cfg)
 	if err != nil {
 		return err
 	}

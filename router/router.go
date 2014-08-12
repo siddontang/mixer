@@ -2,8 +2,7 @@ package router
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v1"
-	"io/ioutil"
+	"github.com/siddontang/mixer/config"
 )
 
 type Rule struct {
@@ -77,11 +76,13 @@ func (r *Router) GetRule(db string, table string) *Rule {
 	return dbRule.GetRule(table)
 }
 
-func NewRouter(cfg *Config) (*Router, error) {
+func NewRouter(cfg *config.Config) (*Router, error) {
 	rt := new(Router)
 	rt.Rules = make(map[string]*DBRules, len(cfg.Rules))
 	for _, r := range cfg.Rules {
-		rule, err := r.ParseRule()
+		rc := &RuleConfig{r}
+
+		rule, err := rc.ParseRule()
 		if err != nil {
 			return nil, err
 		}
@@ -106,27 +107,4 @@ func NewRouter(cfg *Config) (*Router, error) {
 		}
 	}
 	return rt, nil
-}
-
-func NewRouterConfigData(data []byte) (*Router, error) {
-	var cfg Config
-	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return nil, err
-	}
-
-	return NewRouter(&cfg)
-}
-
-func NewRouterConfigFile(fileName string) (*Router, error) {
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return nil, err
-	}
-
-	return NewRouter(&cfg)
 }

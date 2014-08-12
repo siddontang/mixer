@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"github.com/siddontang/mixer/config"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,16 +15,7 @@ var (
 )
 
 type RuleConfig struct {
-	DB    string `yaml:"db"`
-	Table string `yaml:"table"`
-	Key   string `yaml:"key"`
-	Nodes string `yaml:"nodes"`
-	Type  string `yaml:"type"`
-	Range string `yaml:"range"`
-}
-
-type Config struct {
-	Rules []RuleConfig `yaml:"rules"`
+	config.RuleConfig
 }
 
 func (c *RuleConfig) ParseRule() (*Rule, error) {

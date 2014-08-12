@@ -1,4 +1,4 @@
-package proxy
+package config
 
 import (
 	"fmt"
@@ -147,14 +147,5 @@ rules:
 
 	if !reflect.DeepEqual(cfg.Rules[2], testRule) {
 		t.Fatal("rule2 must equal")
-	}
-
-	ruleConfig := cfg.NewRouterConfig()
-	if len(ruleConfig.Rules) == 0 {
-		t.Fatal("must not 0")
-	}
-
-	if ruleConfig.Rules[2].Type != "default" {
-		t.Fatal(ruleConfig.Rules[2].Type)
 	}
 }

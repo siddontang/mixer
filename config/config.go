@@ -1,8 +1,6 @@
-package proxy
+package config
 
 import (
-	"github.com/siddontang/copier"
-	"github.com/siddontang/mixer/router"
 	"gopkg.in/yaml.v1"
 	"io/ioutil"
 )
@@ -62,16 +60,4 @@ func ParseConfigFile(fileName string) (*Config, error) {
 	}
 
 	return ParseConfigData(data)
-}
-
-func (c *Config) NewRouterConfig() *router.Config {
-	cfg := &router.Config{}
-
-	cfg.Rules = make([]router.RuleConfig, len(c.Rules))
-
-	for i, v := range c.Rules {
-		copier.Copy(&cfg.Rules[i], &v)
-	}
-
-	return cfg
 }

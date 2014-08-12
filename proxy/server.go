@@ -2,13 +2,15 @@ package proxy
 
 import (
 	"github.com/siddontang/go-log/log"
+	"github.com/siddontang/mixer/config"
+
 	"net"
 	"runtime"
 	"strings"
 )
 
 type Server struct {
-	cfg *Config
+	cfg *config.Config
 
 	addr     string
 	user     string
@@ -23,7 +25,7 @@ type Server struct {
 	schemas map[string]*Schema
 }
 
-func NewServer(cfg *Config) (*Server, error) {
+func NewServer(cfg *config.Config) (*Server, error) {
 	s := new(Server)
 
 	s.cfg = cfg

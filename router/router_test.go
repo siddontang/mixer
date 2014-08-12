@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/siddontang/mixer/config"
 	"gopkg.in/yaml.v1"
 	"testing"
 )
@@ -34,7 +35,7 @@ rules:
     nodes: node1
     type: default
 `
-	var cfg Config
+	var cfg config.Config
 	if err := yaml.Unmarshal([]byte(s), &cfg); err != nil {
 		t.Fatal(err)
 	}

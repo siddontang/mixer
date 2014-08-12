@@ -1,7 +1,9 @@
 package sqlparser
 
 import (
+	"github.com/siddontang/mixer/config"
 	"github.com/siddontang/mixer/router"
+
 	"testing"
 )
 
@@ -38,7 +40,15 @@ rules:
     type: default
 `
 
-	r, err := router.NewRouterConfigData([]byte(s))
+	cfg, err := config.ParseConfigData([]byte(s))
+	if err != nil {
+		println(err.Error())
+		panic(err)
+	}
+
+	var r *router.Router
+
+	r, err = router.NewRouter(cfg)
 	if err != nil {
 		println(err.Error())
 		panic(err)

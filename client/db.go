@@ -3,39 +3,36 @@ package client
 import (
 	"container/list"
 	. "github.com/siddontang/mixer/mysql"
-
 	"sync"
 )
-
-type Config struct {
-	Addr      string
-	User      string
-	Password  string
-	DB        string
-	IdleConns int
-}
 
 type DB struct {
 	sync.Mutex
 
-	cfg   *Config
+	addr      string
+	user      string
+	password  string
+	db        string
+	idleConns int
+
 	conns *list.List
 }
 
-func Open(cfg *Config) (*DB, error) {
+func Open(addr string, user string, password string, dbName string) (*DB, error) {
 	db := new(DB)
-	db.cfg = cfg
+
+	db.addr = addr
+	db.user = user
+	db.password = password
+	db.db = dbName
+
 	db.conns = list.New()
 
 	return db, nil
 }
 
 func (db *DB) Addr() string {
-	return db.cfg.Addr
-}
-
-func (db *DB) Config() *Config {
-	return db.cfg
+	return db.addr
 }
 
 func (db *DB) Close() error {
@@ -70,10 +67,14 @@ func (db *DB) Ping() error {
 	return err
 }
 
+func (db *DB) SetIdleConns(num int) {
+	db.idleConns = num
+}
+
 func (db *DB) newConn() (*Conn, error) {
 	co := new(Conn)
 
-	if err := co.Connect(db.cfg.Addr, db.cfg.User, db.cfg.Password, db.cfg.DB); err != nil {
+	if err := co.Connect(db.addr, db.user, db.password, db.db); err != nil {
 		return nil, err
 	}
 
@@ -134,10 +135,10 @@ func (db *DB) PushConn(co *Conn, err error) {
 	if err == ErrBadConn {
 		closeConn = co
 	} else {
-		if db.cfg.IdleConns > 0 {
+		if db.idleConns > 0 {
 			db.Lock()
 
-			if db.conns.Len() >= db.cfg.IdleConns {
+			if db.conns.Len() >= db.idleConns {
 				v := db.conns.Front()
 				closeConn = v.Value.(*Conn)
 				db.conns.Remove(v)
