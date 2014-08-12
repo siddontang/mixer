@@ -1,13 +1,22 @@
 # Mixer
 
-Mixer is not only a mysql proxy, its aim to supply a simple solution for mysql use.
+Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using MySQL.
 
-It aim to solve some mysql use problem in my company, which expects to support following feature:
+## Featrues
 
-- split read and write.
-- mysql node HA, if main node crashed, switch to backup node automatically.
+- Supports base MySQL 
+- Splits read and write.
+- MySQL HA, switchs backup automatically if main crashed
+- Base SQL Routing
 
-# Install 
+## Todo
+
+- Enhance Routing Rule.
+- SQL validation check. 
+- Statistics.
+- Prepare statement.
+
+## Install 
 
     cd $WORKSPACE
     git clone git@github.com:siddontang/mixer.git src/github.com/siddontang/mixer
@@ -21,19 +30,42 @@ It aim to solve some mysql use problem in my company, which expects to support f
     make
     make test
 
+## Base Example
 
-# Todo....
+```
+#start mixer
+mixer-proxy -config=/etc/mixer.conf
 
-- supply custom rule to dispatch query to different mysql nodes. 
-- statistics. 
+#another shell
+mysql -P4000 -uroot
 
-# Feedback
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 158
+Server version: 5.6.19 Homebrew
 
-see [My Chinese Blog](http://blog.csdn.net/siddontang/article/category/2093877) for more.
+mysql> use mixer;
+Database changed
 
-now mixer is only simple and not perfect. I need your feedback to improve continually. Thank you very much!
+mysql> delete from mixer_test_conn;
+Query OK, 3 rows affected (0.04 sec)
+
+mysql> insert into mixer_test_conn (id, str) values (1, "a");
+Query OK, 1 row affected (0.00 sec)
+
+mysql> insert into mixer_test_conn (id, str) values (2, "b");
+Query OK, 1 row affected (0.00 sec)
+
+mysql> select id, str from mixer_test_conn;
++----+------+
+| id | str  |
++----+------+
+|  1 | a    |
+|  2 | b    |
++----+------+
+``` 
+
+## Feedback
 
 Email: siddontang@gmail.com
 
-QQ: 335498184
 
