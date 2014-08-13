@@ -65,13 +65,14 @@ func checkSharding(t *testing.T, sql string, checkNodeIndex ...int) {
 	if err != nil {
 		t.Fatal(sql, err)
 	} else if len(ns) != len(checkNodeIndex) {
-		t.Fatal(sql, len(ns), len(checkNodeIndex))
+		s := fmt.Sprintf("%v %v", ns, checkNodeIndex)
+		t.Fatal(sql, s)
 	} else {
 
 		for i := range ns {
 			if ns[i] != checkNodeIndex[i] {
-				fmt.Printf("%v %v", ns, checkNodeIndex)
-				t.Fatal(sql, ns[i], checkNodeIndex[i])
+				s := fmt.Sprintf("%v %v", ns, checkNodeIndex)
+				t.Fatal(sql, s, i)
 			}
 		}
 	}
@@ -157,6 +158,9 @@ func TestConditionSharding(t *testing.T) {
 
 	sql = "select * from test2 where id in (1000, 10000)"
 	checkSharding(t, sql, 0, 1)
+
+	sql = "select * from test2 where id > -1"
+	checkSharding(t, sql, 0, 1, 2)
 }
 
 func TestValueSharding(t *testing.T) {

@@ -64,6 +64,133 @@ mysql> select id, str from mixer_test_conn;
 +----+------+
 ``` 
 
+## Hash Sharding Example
+
+```
+table: mixer_test_shard_hash
+
+Node: node2, node3
+node2 mysql: 127.0.0.1:3307
+node3 mysql: 127.0.0.1:3308
+
+mixer-proxy: 127.0.0.1:4000
+
+proxy> mysql -uroot -h127.0.0.1 -P4000 -p -Dmixer
+node2> mysql -uroot -h127.0.0.1 -P3307 -p -Dmixer
+node3> mysql -uroot -h127.0.0.1 -P3307 -p -Dmixer
+
+proxy> insert into mixer_test_shard_hash (id, str) values (0, "a");
+node2> select str from mixer_test_shard_hash where id = 0;
++------+
+| str  |
++------+
+| a    |
++------+
+
+proxy> insert into mixer_test_shard_hash (id, str) values (1, "b");
+node3> select str from mixer_test_shard_hash where id = 1;
++------+
+| str  |
++------+
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_hash where id in (0, 1);
++------+
+| str  |
++------+
+| a    |
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_hash where id = 0 or id = 1;
++------+
+| str  |
++------+
+| a    |
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_hash where id = 0 and id = 1;
+Empty set
+```
+
+
+## Range Sharding Example
+
+```
+table: mixer_test_shard_range
+
+Node: node2, node3
+node2 range: (-inf, 10000)
+node3 range: [10000, +inf)
+node2 mysql: 127.0.0.1:3307
+node3 mysql: 127.0.0.1:3308
+
+mixer-proxy: 127.0.0.1:4000
+
+proxy> mysql -uroot -h127.0.0.1 -P4000 -p -Dmixer
+node2> mysql -uroot -h127.0.0.1 -P3307 -p -Dmixer
+node3> mysql -uroot -h127.0.0.1 -P3307 -p -Dmixer
+
+proxy> insert into mixer_test_shard_range (id, str) values (0, "a");
+node2> select str from mixer_test_shard_range where id = 0;
++------+
+| str  |
++------+
+| a    |
++------+
+
+proxy> insert into mixer_test_shard_range (id, str) values (10000, "b");
+node3> select str from mixer_test_shard_range where id = 10000;
++------+
+| str  |
++------+
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_range where id in (0, 10000);
++------+
+| str  |
++------+
+| a    |
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_range where id = 0 or id = 10000;
++------+
+| str  |
++------+
+| a    |
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_range where id = 0 and id = 10000;
+Empty set
+
+proxy> select str from mixer_test_shard_range where id > 100;
++------+
+| str  |
++------+
+| b    |
++------+
+
+proxy> select str from mixer_test_shard_range where id < 100;
++------+
+| str  |
++------+
+| a    |
++------+
+
+proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
++------+
+| str  |
++------+
+| a    |
+| b    |
++------+
+```
+
 ## Feedback
 
 Email: siddontang@gmail.com

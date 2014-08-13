@@ -215,6 +215,10 @@ func (c *Conn) readHandshakeResponse() error {
 	pos += authLen
 
 	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
+		if len(data[pos:]) == 0 {
+			return nil
+		}
+
 		db := string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
 		pos += len(c.db) + 1
 
@@ -268,7 +272,11 @@ func (c *Conn) dispatch(data []byte) error {
 	case COM_PING:
 		return c.writeOK(nil)
 	case COM_INIT_DB:
-		return c.useDB(hack.String(data))
+		if err := c.useDB(hack.String(data)); err != nil {
+			return err
+		} else {
+			return c.writeOK(nil)
+		}
 	// case COM_STMT_PREPARE:
 	// 	return c.handleStmtPrepare(data)
 	// case COM_STMT_EXECUTE:
