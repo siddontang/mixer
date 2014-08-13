@@ -60,7 +60,7 @@ func (c *Conn) getShardList(stmt sqlparser.Statement) ([]*Node, error) {
 		return nil, NewDefaultError(ER_NO_DB_ERROR)
 	}
 
-	ns, err := sqlparser.GetStmtShardList(stmt, nil, c.schema.rule)
+	ns, err := sqlparser.GetStmtShardList(stmt, c.schema.rule)
 	if err != nil {
 		return nil, err
 	}

@@ -5,9 +5,9 @@
 package sqlparser
 
 import (
-	"strconv"
-
 	"github.com/siddontang/mixer/router"
+	"sort"
+	"strconv"
 )
 
 const (
@@ -21,6 +21,8 @@ type RoutingPlan struct {
 	rule *router.Rule
 
 	criteria SQLNode
+
+	fullList []int
 }
 
 /*
@@ -36,22 +38,32 @@ type RoutingPlan struct {
 		where id <= 1
 		where id between 1 and 10
 */
-func GetShardList(sql string, bindVariables map[string]interface{}, r *router.DBRules) (nodes []string, err error) {
+func GetShardList(sql string, r *router.DBRules) (nodes []string, err error) {
 	var stmt Statement
 	stmt, err = Parse(sql)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetStmtShardList(stmt, bindVariables, r)
+	return GetStmtShardList(stmt, r)
 }
 
-func GetStmtShardList(stmt Statement, bindVariables map[string]interface{}, r *router.DBRules) (nodes []string, err error) {
+func GetShardListIndex(sql string, r *router.DBRules) (nodes []int, err error) {
+	var stmt Statement
+	stmt, err = Parse(sql)
+	if err != nil {
+		return nil, err
+	}
+
+	return GetStmtShardListIndex(stmt, r)
+}
+
+func GetStmtShardList(stmt Statement, r *router.DBRules) (nodes []string, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
 
-	ns := plan.shardListFromPlan(bindVariables)
+	ns := plan.shardListFromPlan()
 
 	nodes = make([]string, 0, len(ns))
 	for _, i := range ns {
@@ -61,52 +73,121 @@ func GetStmtShardList(stmt Statement, bindVariables map[string]interface{}, r *r
 	return nodes, nil
 }
 
-func (plan *RoutingPlan) shardListFromPlan(bindVariables map[string]interface{}) (shardList []int) {
+func GetStmtShardListIndex(stmt Statement, r *router.DBRules) (nodes []int, err error) {
+	defer handleError(&err)
+
+	plan := getRoutingPlan(stmt, r)
+
+	ns := plan.shardListFromPlan()
+
+	return ns, nil
+}
+
+func (plan *RoutingPlan) notList(l []int) []int {
+	return differentList(plan.fullList, l)
+}
+
+func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
+	var index int
+	switch criteria := expr.(type) {
+	case *ComparisonExpr:
+		switch criteria.Operator {
+		case "=", "<=>":
+			if plan.routingAnalyzeValue(criteria.Left) == EID_NODE {
+				index = plan.findShard(criteria.Right)
+			} else {
+				index = plan.findShard(criteria.Left)
+			}
+			return []int{index}
+		case "<", "<=":
+			if plan.rule.Type == router.HashRuleType {
+				return plan.fullList
+			}
+
+			if plan.routingAnalyzeValue(criteria.Left) == EID_NODE {
+				index = plan.findShard(criteria.Right)
+				if criteria.Operator == "<" {
+					index = plan.adjustShardIndex(criteria.Right, index)
+				}
+
+				return makeList(0, index+1)
+			} else {
+				index = plan.findShard(criteria.Left)
+				return makeList(index, len(plan.rule.Nodes))
+			}
+		case ">", ">=":
+			if plan.rule.Type == router.HashRuleType {
+				return plan.fullList
+			}
+
+			if plan.routingAnalyzeValue(criteria.Left) == EID_NODE {
+				index = plan.findShard(criteria.Right)
+				return makeList(index, len(plan.rule.Nodes))
+			} else {
+				index = plan.findShard(criteria.Left)
+
+				if criteria.Operator == ">" {
+					index = plan.adjustShardIndex(criteria.Left, index)
+				}
+				return makeList(0, index+1)
+			}
+		case "in":
+			return plan.findShardList(criteria.Right)
+		case "not in":
+			if plan.rule.Type == router.RangeRuleType {
+				return plan.fullList
+			}
+
+			l := plan.findShardList(criteria.Right)
+			return plan.notList(l)
+		}
+	case *RangeCond:
+		if plan.rule.Type == router.HashRuleType {
+			return plan.fullList
+		}
+
+		start := plan.findShard(criteria.From)
+		last := plan.findShard(criteria.To)
+
+		if criteria.Operator == "between" {
+			if last < start {
+				start, last = last, start
+			}
+			l := makeList(start, last+1)
+			return l
+		} else {
+			if last < start {
+				start, last = last, start
+				start = plan.adjustShardIndex(criteria.To, start)
+			} else {
+				start = plan.adjustShardIndex(criteria.From, start)
+			}
+
+			l1 := makeList(0, start+1)
+			l2 := makeList(last, len(plan.rule.Nodes))
+			return unionList(l1, l2)
+		}
+	default:
+		return plan.fullList
+	}
+
+	return plan.fullList
+}
+
+func (plan *RoutingPlan) shardListFromPlan() (shardList []int) {
 	if plan.criteria == nil {
-		return makeList(0, len(plan.rule.Nodes))
+		return plan.fullList
 	}
 
 	switch criteria := plan.criteria.(type) {
 	case Values:
-		index := plan.findInsertShard(criteria, bindVariables)
+		index := plan.findInsertShard(criteria)
 		return []int{index}
-	case *ComparisonExpr:
-		switch criteria.Operator {
-		case "=", "<=>":
-			index := plan.findShard(criteria.Right, bindVariables)
-			return []int{index}
-		case "<", "<=":
-			if plan.rule.Type == router.HashRuleType {
-				return makeList(0, len(plan.rule.Nodes))
-			}
-
-			index := plan.findShard(criteria.Right, bindVariables)
-			return makeList(0, index+1)
-		case ">", ">=":
-			if plan.rule.Type == router.HashRuleType {
-				return makeList(0, len(plan.rule.Nodes))
-			}
-
-			index := plan.findShard(criteria.Right, bindVariables)
-			return makeList(index, len(plan.rule.Nodes))
-		case "in":
-			return plan.findShardList(criteria.Right, bindVariables)
-		}
-	case *RangeCond:
-		if plan.rule.Type == router.HashRuleType {
-			return makeList(0, len(plan.rule.Nodes))
-		}
-
-		if criteria.Operator == "between" {
-			start := plan.findShard(criteria.From, bindVariables)
-			last := plan.findShard(criteria.To, bindVariables)
-			if last < start {
-				start, last = last, start
-			}
-			return makeList(start, last+1)
-		}
+	case BoolExpr:
+		return plan.routingAnalyzeBoolean(criteria)
+	default:
+		return plan.fullList
 	}
-	return makeList(0, len(plan.rule.Nodes))
 }
 
 func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) {
@@ -120,6 +201,7 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 
 		plan.rule = r.GetRule(String(stmt.Table))
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
+		plan.fullList = makeList(0, len(plan.rule.Nodes))
 		return plan
 	case *Replace:
 		if _, ok := stmt.Rows.(SelectStatement); ok {
@@ -142,10 +224,12 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 	}
 
 	if where != nil {
-		plan.criteria = plan.routingAnalyzeBoolean(where.Expr)
+		plan.criteria = where.Expr
 	} else {
 		plan.rule = r.DefaultRule
 	}
+	plan.fullList = makeList(0, len(plan.rule.Nodes))
+
 	return plan
 }
 
@@ -165,18 +249,17 @@ func (plan *RoutingPlan) routingAnalyzeValues(vals Values) Values {
 	return vals
 }
 
-func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) BoolExpr {
+func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) []int {
 	switch node := node.(type) {
 	case *AndExpr:
 		left := plan.routingAnalyzeBoolean(node.Left)
 		right := plan.routingAnalyzeBoolean(node.Right)
-		if left != nil && right != nil {
-			return nil
-		} else if left != nil {
-			return left
-		} else {
-			return right
-		}
+
+		return interList(left, right)
+	case *OrExpr:
+		left := plan.routingAnalyzeBoolean(node.Left)
+		right := plan.routingAnalyzeBoolean(node.Right)
+		return unionList(left, right)
 	case *ParenBoolExpr:
 		return plan.routingAnalyzeBoolean(node.Expr)
 	case *ComparisonExpr:
@@ -185,27 +268,24 @@ func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) BoolExpr {
 			left := plan.routingAnalyzeValue(node.Left)
 			right := plan.routingAnalyzeValue(node.Right)
 			if (left == EID_NODE && right == VALUE_NODE) || (left == VALUE_NODE && right == EID_NODE) {
-				return node
+				return plan.findConditionShard(node)
 			}
-		case node.Operator == "in":
+		case StringIn(node.Operator, "in", "not in"):
 			left := plan.routingAnalyzeValue(node.Left)
 			right := plan.routingAnalyzeValue(node.Right)
 			if left == EID_NODE && right == LIST_NODE {
-				return node
+				return plan.findConditionShard(node)
 			}
 		}
 	case *RangeCond:
-		if node.Operator != "between" {
-			return nil
-		}
 		left := plan.routingAnalyzeValue(node.Left)
 		from := plan.routingAnalyzeValue(node.From)
 		to := plan.routingAnalyzeValue(node.To)
 		if left == EID_NODE && from == VALUE_NODE && to == VALUE_NODE {
-			return node
+			return plan.findConditionShard(node)
 		}
 	}
-	return nil
+	return plan.fullList
 }
 
 func (plan *RoutingPlan) routingAnalyzeValue(valExpr ValExpr) int {
@@ -227,12 +307,12 @@ func (plan *RoutingPlan) routingAnalyzeValue(valExpr ValExpr) int {
 	return OTHER_NODE
 }
 
-func (plan *RoutingPlan) findShardList(valExpr ValExpr, bindVariables map[string]interface{}) []int {
+func (plan *RoutingPlan) findShardList(valExpr ValExpr) []int {
 	shardset := make(map[int]bool)
 	switch node := valExpr.(type) {
 	case ValTuple:
 		for _, n := range node {
-			index := plan.findShard(n, bindVariables)
+			index := plan.findShard(n)
 			shardset[index] = true
 		}
 	}
@@ -243,14 +323,15 @@ func (plan *RoutingPlan) findShardList(valExpr ValExpr, bindVariables map[string
 		index++
 	}
 
+	sort.Ints(shardlist)
 	return shardlist
 }
 
-func (plan *RoutingPlan) findInsertShard(vals Values, bindVariables map[string]interface{}) int {
+func (plan *RoutingPlan) findInsertShard(vals Values) int {
 	index := -1
 	for i := 0; i < len(vals); i++ {
 		first_value_expression := vals[i].(ValTuple)[0]
-		newIndex := plan.findShard(first_value_expression, bindVariables)
+		newIndex := plan.findShard(first_value_expression)
 		if index == -1 {
 			index = newIndex
 		} else if index != newIndex {
@@ -260,19 +341,36 @@ func (plan *RoutingPlan) findInsertShard(vals Values, bindVariables map[string]i
 	return index
 }
 
-func (plan *RoutingPlan) findShard(valExpr ValExpr, bindVariables map[string]interface{}) int {
-	value := getBoundValue(valExpr, bindVariables)
+func (plan *RoutingPlan) findShard(valExpr ValExpr) int {
+	value := getBoundValue(valExpr)
 	return plan.rule.FindNodeIndex(value)
 }
 
-func getBoundValue(valExpr ValExpr, bindVariables map[string]interface{}) interface{} {
+func (plan *RoutingPlan) adjustShardIndex(valExpr ValExpr, index int) int {
+	value := getBoundValue(valExpr)
+
+	s, ok := plan.rule.Shard.(*router.RangeShard)
+	if !ok {
+		return index
+	}
+
+	if s.Shards[index].Start == router.KeyspaceId(router.EncodeValue(value)) {
+		index--
+		if index < 0 {
+			panic(NewParserError("invalid range sharding"))
+		}
+	}
+	return index
+}
+
+func getBoundValue(valExpr ValExpr) interface{} {
 	switch node := valExpr.(type) {
 	case ValTuple:
 		if len(node) != 1 {
 			panic(NewParserError("tuples not allowed as insert values"))
 		}
 		// TODO: Change parser to create single value tuples into non-tuples.
-		return getBoundValue(node[0], bindVariables)
+		return getBoundValue(node[0])
 	case StrVal:
 		return string(node)
 	case NumVal:
@@ -281,22 +379,8 @@ func getBoundValue(valExpr ValExpr, bindVariables map[string]interface{}) interf
 			panic(NewParserError("%s", err.Error()))
 		}
 		return val
-	case ValArg:
-		value := findBindValue(node, bindVariables)
-		return value
 	}
 	panic("Unexpected token")
-}
-
-func findBindValue(valArg ValArg, bindVariables map[string]interface{}) interface{} {
-	if bindVariables == nil {
-		panic(NewParserError("No bind variable for " + string(valArg)))
-	}
-	value, ok := bindVariables[string(valArg[1:])]
-	if !ok {
-		panic(NewParserError("No bind variable for " + string(valArg)))
-	}
-	return value
 }
 
 func makeList(start, end int) []int {
@@ -305,4 +389,94 @@ func makeList(start, end int) []int {
 		list[i-start] = i
 	}
 	return list
+}
+
+// l1 & l2
+func interList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 || len(l2) == 0 {
+		return []int{}
+	}
+
+	l3 := make([]int, 0, len(l1)+len(l2))
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] == l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+			j++
+		} else if l1[i] < l2[j] {
+			i++
+		} else {
+			j++
+		}
+	}
+
+	return l3
+}
+
+// l1 | l2
+func unionList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 {
+		return l2
+	} else if len(l2) == 0 {
+		return l1
+	}
+
+	l3 := make([]int, 0, len(l1)+len(l2))
+
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] < l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+		} else if l1[i] > l2[j] {
+			l3 = append(l3, l2[j])
+			j++
+		} else {
+			l3 = append(l3, l1[i])
+			i++
+			j++
+		}
+	}
+
+	if i != len(l1) {
+		l3 = append(l3, l1[i:]...)
+	} else if j != len(l2) {
+		l3 = append(l3, l2[j:]...)
+	}
+
+	return l3
+}
+
+// l1 - l2
+func differentList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 {
+		return []int{}
+	} else if len(l2) == 0 {
+		return l1
+	}
+
+	l3 := make([]int, 0, len(l1))
+
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] < l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+		} else if l1[i] > l2[j] {
+			j++
+		} else {
+			i++
+			j++
+		}
+	}
+
+	if i != len(l1) {
+		l3 = append(l3, l1[i:]...)
+	}
+
+	return l3
 }

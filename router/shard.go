@@ -77,8 +77,9 @@ type RangeShard struct {
 }
 
 func (s *RangeShard) FindForKey(key interface{}) int {
+	v := KeyspaceId(EncodeValue(key))
 	for i, r := range s.Shards {
-		if r.Contains(KeyspaceId(EncodeValue(key))) {
+		if r.Contains(v) {
 			return i
 		}
 	}
