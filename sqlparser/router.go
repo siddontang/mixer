@@ -28,7 +28,7 @@ type RoutingPlan struct {
 /*
 	Limitation:
 
-	where, eg, key name is id, only supports below now:
+	where, eg, key name is id:
 
 		where id = 1
 		where id in (1, 2, 3)
@@ -37,6 +37,7 @@ type RoutingPlan struct {
 		where id < 1
 		where id <= 1
 		where id between 1 and 10
+		where id >= 1 and id < 10
 */
 func GetShardList(sql string, r *router.DBRules) (nodes []string, err error) {
 	var stmt Statement
