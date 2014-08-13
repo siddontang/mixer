@@ -23,17 +23,34 @@ nodes :
     name : node1 
     down_after_noalive : 300
     idle_conns : 16
-    rw_split: true
+    rw_split: false
     user: root
     password:
     master : 127.0.0.1:3306
     master_backup : 
     slave : 
+- 
+    name : node2
+    down_after_noalive : 300
+    idle_conns : 16
+    rw_split: false
+    user: root
+    password:
+    master : 127.0.0.1:3307
+
+- 
+    name : node3 
+    down_after_noalive : 300
+    idle_conns : 16
+    rw_split: false
+    user: root
+    password:
+    master : 127.0.0.1:3308
 
 schemas :
 -
     db : mixer 
-    nodes: [node1]
+    nodes: [node1, node2, node3]
 
 rules:
 -   db: mixer
@@ -41,9 +58,23 @@ rules:
     key:
     nodes: node1
     type: default
+-   db: mixer
+    table: mixer_test_shard_hash
+    key: id
+    nodes: node2,node3
+    type: hash
+-   db: mixer
+    table: mixer_test_shard_range
+    key: id
+    range: 
+    nodes: node2, node3
+    #node2 : (-inf, 10000)
+    #node3 : [10000, +inf)
+    range: -0000000000002710-
+    type: range
 `)
 
-func newTestServer() *Server {
+func newTestServer(t *testing.T) *Server {
 	f := func() {
 		cfg, err := config.ParseConfigData(testConfigData)
 		if err != nil {
@@ -53,8 +84,7 @@ func newTestServer() *Server {
 
 		testServer, err = NewServer(cfg)
 		if err != nil {
-			println(err.Error())
-			panic(err)
+			t.Fatal(err)
 		}
 
 		go testServer.Run()
@@ -67,16 +97,15 @@ func newTestServer() *Server {
 	return testServer
 }
 
-func newTestDB() *client.DB {
-	newTestServer()
+func newTestDB(t *testing.T) *client.DB {
+	newTestServer(t)
 
 	f := func() {
 		var err error
 		testDB, err = client.Open("127.0.0.1:4000", "root", "", "mixer")
 
 		if err != nil {
-			println(err.Error())
-			panic(err)
+			t.Fatal(err)
 		}
 
 		testDB.SetIdleConns(4)
@@ -86,19 +115,18 @@ func newTestDB() *client.DB {
 	return testDB
 }
 
-func newTestDBConn() *client.SqlConn {
-	db := newTestDB()
+func newTestDBConn(t *testing.T) *client.SqlConn {
+	db := newTestDB(t)
 
 	c, err := db.GetConn()
 
 	if err != nil {
-		println(err.Error())
-		panic(err)
+		t.Fatal(err)
 	}
 
 	return c
 }
 
 func TestServer(t *testing.T) {
-	newTestServer()
+	newTestServer(t)
 }

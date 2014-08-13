@@ -6,7 +6,7 @@ import (
 )
 
 func TestConn_Handshake(t *testing.T) {
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 
 	if err := c.Ping(); err != nil {
 		t.Fatal(err)
@@ -16,16 +16,17 @@ func TestConn_Handshake(t *testing.T) {
 }
 
 func TestConn_DeleteTable(t *testing.T) {
-	server := newTestServer()
-	nodes := server.nodes
-	for _, n := range nodes {
-		c, _ := n.getMasterConn()
-		c.UseDB("mixer")
-		if _, err := c.Execute(`drop table if exists mixer_test_proxy_conn`); err != nil {
-			t.Fatal(err)
-		}
-		c.Close()
+	server := newTestServer(t)
+	n := server.nodes["node1"]
+	c, err := n.getMasterConn()
+	if err != nil {
+		t.Fatal(err)
 	}
+	c.UseDB("mixer")
+	if _, err := c.Execute(`drop table if exists mixer_test_proxy_conn`); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
 }
 
 func TestConn_CreateTable(t *testing.T) {
@@ -40,22 +41,24 @@ func TestConn_CreateTable(t *testing.T) {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
-	server := newTestServer()
-	nodes := server.nodes
-	for _, n := range nodes {
-		c, _ := n.getMasterConn()
-		c.UseDB("mixer")
-		defer c.Close()
-		if _, err := c.Execute(s); err != nil {
-			t.Fatal(err)
-		}
+	server := newTestServer(t)
+	n := server.nodes["node1"]
+	c, err := n.getMasterConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c.UseDB("mixer")
+	defer c.Close()
+	if _, err := c.Execute(s); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func TestConn_Insert(t *testing.T) {
 	s := `insert into mixer_test_proxy_conn (id, str, f, e, u, i) values(1, "abc", 3.14, "test1", 255, -127)`
 
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute(s); err != nil {
@@ -70,7 +73,7 @@ func TestConn_Insert(t *testing.T) {
 func TestConn_Select(t *testing.T) {
 	s := `select str, f, e, u, i, ni from mixer_test_proxy_conn where id = 1`
 
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute(s); err != nil {
@@ -113,7 +116,7 @@ func TestConn_Select(t *testing.T) {
 func TestConn_Update(t *testing.T) {
 	s := `update mixer_test_proxy_conn set str = "123" where id = 1`
 
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if _, err := c.Execute(s); err != nil {
@@ -132,7 +135,7 @@ func TestConn_Update(t *testing.T) {
 func TestConn_Replace(t *testing.T) {
 	s := `replace into mixer_test_proxy_conn (id, str, f) values(1, "abc", 3.14159)`
 
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute(s); err != nil {
@@ -179,7 +182,7 @@ func TestConn_Replace(t *testing.T) {
 func TestConn_Delete(t *testing.T) {
 	s := `delete from mixer_test_proxy_conn where id = 100000`
 
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute(s); err != nil {
@@ -192,7 +195,7 @@ func TestConn_Delete(t *testing.T) {
 }
 
 func TestConn_SetAutoCommit(t *testing.T) {
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute("set autocommit = 1"); err != nil {
@@ -213,10 +216,10 @@ func TestConn_SetAutoCommit(t *testing.T) {
 }
 
 func TestConn_Trans(t *testing.T) {
-	c1 := newTestDBConn()
+	c1 := newTestDBConn(t)
 	defer c1.Close()
 
-	c2 := newTestDBConn()
+	c2 := newTestDBConn(t)
 	defer c2.Close()
 
 	var err error
@@ -263,7 +266,7 @@ func TestConn_Trans(t *testing.T) {
 }
 
 func TestConn_SetNames(t *testing.T) {
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if err := c.SetCharset("gb2312"); err != nil {
@@ -278,19 +281,21 @@ func TestConn_LastInsertId(t *testing.T) {
           PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8`
 
-	server := newTestServer()
-	nodes := server.nodes
-	for _, n := range nodes {
-		c1, _ := n.getMasterConn()
+	server := newTestServer(t)
+	n := server.nodes["node1"]
 
-		if _, err := c1.Execute(s); err != nil {
-			t.Fatal(err)
-		}
-
-		c1.Close()
+	c1, err := n.getMasterConn()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	c := newTestDBConn()
+	if _, err := c1.Execute(s); err != nil {
+		t.Fatal(err)
+	}
+
+	c1.Close()
+
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	r, err := c.Execute(`insert into mixer_test_conn_id (str) values ("abc")`)
@@ -319,19 +324,17 @@ func TestConn_LastInsertId(t *testing.T) {
 		}
 	}
 
-	for _, n := range nodes {
-		c1, _ := n.getMasterConn()
+	c1, _ = n.getMasterConn()
 
-		if _, err := c1.Execute(`drop table if exists mixer_test_conn_id`); err != nil {
-			t.Fatal(err)
-		}
-
-		c1.Close()
+	if _, err := c1.Execute(`drop table if exists mixer_test_conn_id`); err != nil {
+		t.Fatal(err)
 	}
+
+	c1.Close()
 }
 
 func TestConn_RowCount(t *testing.T) {
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	r, err := c.Execute(`insert into mixer_test_proxy_conn (id, str) values (1002, "abc")`)
@@ -359,7 +362,7 @@ func TestConn_RowCount(t *testing.T) {
 }
 
 func TestConn_SelectVersion(t *testing.T) {
-	c := newTestDBConn()
+	c := newTestDBConn(t)
 	defer c.Close()
 
 	if r, err := c.Execute("select version()"); err != nil {

@@ -3,6 +3,7 @@ package proxy
 import (
 	"fmt"
 	"github.com/siddontang/mixer/client"
+	"github.com/siddontang/mixer/hack"
 	. "github.com/siddontang/mixer/mysql"
 	"github.com/siddontang/mixer/sqlparser"
 	"strings"
@@ -27,7 +28,7 @@ func (c *Conn) handleQuery(sql string) (err error) {
 
 	switch v := stmt.(type) {
 	case *sqlparser.Select:
-		return c.handleSelect(sql, stmt)
+		return c.handleSelect(sql, v)
 	case *sqlparser.Insert:
 		return c.handleExec(sql, stmt)
 	case *sqlparser.Update:
@@ -66,7 +67,7 @@ func (c *Conn) getShardList(stmt sqlparser.Statement) ([]*Node, error) {
 	}
 
 	if len(ns) == 0 {
-		return nil, fmt.Errorf("must shard to a node")
+		return nil, nil
 	}
 
 	n := make([]*Node, 0, len(ns))
@@ -123,6 +124,8 @@ func (c *Conn) getShardConns(stmt sqlparser.Statement) ([]*client.SqlConn, error
 	nodes, err := c.getShardList(stmt)
 	if err != nil {
 		return nil, err
+	} else if nodes == nil {
+		return nil, nil
 	}
 
 	conns := make([]*client.SqlConn, 0, len(nodes))
@@ -190,10 +193,40 @@ func (c *Conn) closeShardConns(conns []*client.SqlConn, rollback bool) {
 	}
 }
 
-func (c *Conn) handleSelect(sql string, stmt sqlparser.Statement) error {
+func (c *Conn) newEmptyResultset(stmt *sqlparser.Select) *Resultset {
+	r := new(Resultset)
+	r.Fields = make([]*Field, len(stmt.SelectExprs))
+
+	for i, expr := range stmt.SelectExprs {
+		r.Fields[i] = &Field{}
+		switch e := expr.(type) {
+		case *sqlparser.StarExpr:
+			r.Fields[i].Name = []byte("*")
+		case *sqlparser.NonStarExpr:
+			if e.As != nil {
+				r.Fields[i].Name = e.As
+				r.Fields[i].OrgName = hack.Slice(nstring(e.Expr))
+			} else {
+				r.Fields[i].Name = hack.Slice(nstring(e.Expr))
+			}
+		default:
+			r.Fields[i].Name = hack.Slice(nstring(e))
+		}
+	}
+
+	r.Values = make([][]interface{}, 0)
+	r.RowDatas = make([]RowData, 0)
+
+	return r
+}
+
+func (c *Conn) handleSelect(sql string, stmt *sqlparser.Select) error {
 	conns, err := c.getShardConns(stmt)
 	if err != nil {
 		return err
+	} else if conns == nil {
+		r := c.newEmptyResultset(stmt)
+		return c.writeResultset(c.status, r)
 	}
 
 	var rs []*Result
@@ -203,7 +236,7 @@ func (c *Conn) handleSelect(sql string, stmt sqlparser.Statement) error {
 	c.closeShardConns(conns, false)
 
 	if err == nil {
-		err = c.mergeSelectResult(rs, stmt.(*sqlparser.Select))
+		err = c.mergeSelectResult(rs, stmt)
 	}
 
 	return err
@@ -241,6 +274,8 @@ func (c *Conn) handleExec(sql string, stmt sqlparser.Statement) error {
 	conns, err := c.getShardConns(stmt)
 	if err != nil {
 		return err
+	} else if conns == nil {
+		return c.writeOK(nil)
 	}
 
 	var rs []*Result
@@ -315,7 +350,7 @@ func (c *Conn) mergeSelectResult(rs []*Result, stmt *sqlparser.Select) error {
 
 	//to do order by, group by, limit offset
 
-	return c.writeResultset(0, r)
+	return c.writeResultset(status, r)
 }
 
 func (c *Conn) writeResultset(status uint16, r *Resultset) error {
