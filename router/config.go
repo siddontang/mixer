@@ -99,7 +99,7 @@ func (c *RuleConfig) parseShard(r *Rule) error {
 		//hash shard
 		r.Shard = &HashShard{ShardNum: len(r.Nodes)}
 	} else if r.Type == RangeRuleType {
-		rs, err := ParseShardingSpec(c.Range)
+		rs, err := ParseNumShardingSpec(c.Range)
 		if err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (c *RuleConfig) parseShard(r *Rule) error {
 			return fmt.Errorf("range space %d not equal nodes %d", len(rs), len(r.Nodes))
 		}
 
-		r.Shard = &RangeShard{Shards: rs}
+		r.Shard = &NumRangeShard{Shards: rs}
 	} else {
 		r.Shard = &DefaultShard{}
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/siddontang/mixer/hack"
 	"hash/crc32"
+	"strconv"
 )
 
 type KeyError string
@@ -58,8 +59,38 @@ func HashValue(value interface{}) uint64 {
 	panic(NewKeyError("Unexpected key variable type %T", value))
 }
 
+func NumValue(value interface{}) int64 {
+	switch val := value.(type) {
+	case int:
+		return int64(val)
+	case uint64:
+		return int64(val)
+	case int64:
+		return int64(val)
+	case string:
+		if v, err := strconv.ParseInt(val, 10, 64); err != nil {
+			panic(NewKeyError("invalid num format %s", v))
+		} else {
+			return v
+		}
+	case []byte:
+		if v, err := strconv.ParseInt(hack.String(val), 10, 64); err != nil {
+			panic(NewKeyError("invalid num format %s", v))
+		} else {
+			return v
+		}
+	}
+	panic(NewKeyError("Unexpected key variable type %T", value))
+}
+
 type Shard interface {
 	FindForKey(key interface{}) int
+}
+
+type RangeShard interface {
+	Shard
+	EqualStart(key interface{}, index int) bool
+	EqualStop(key interface{}, index int) bool
 }
 
 type HashShard struct {
@@ -72,11 +103,34 @@ func (s *HashShard) FindForKey(key interface{}) int {
 	return int(h % uint64(s.ShardNum))
 }
 
-type RangeShard struct {
+type NumRangeShard struct {
+	Shards []NumKeyRange
+}
+
+func (s *NumRangeShard) FindForKey(key interface{}) int {
+	v := NumValue(key)
+	for i, r := range s.Shards {
+		if r.Contains(v) {
+			return i
+		}
+	}
+	panic(NewKeyError("Unexpected key %v, not in range", key))
+}
+
+func (s *NumRangeShard) EqualStart(key interface{}, index int) bool {
+	v := NumValue(key)
+	return s.Shards[index].Start == v
+}
+func (s *NumRangeShard) EqualStop(key interface{}, index int) bool {
+	v := NumValue(key)
+	return s.Shards[index].End == v
+}
+
+type KeyRangeShard struct {
 	Shards []KeyRange
 }
 
-func (s *RangeShard) FindForKey(key interface{}) int {
+func (s *KeyRangeShard) FindForKey(key interface{}) int {
 	v := KeyspaceId(EncodeValue(key))
 	for i, r := range s.Shards {
 		if r.Contains(v) {
@@ -84,6 +138,15 @@ func (s *RangeShard) FindForKey(key interface{}) int {
 		}
 	}
 	panic(NewKeyError("Unexpected key %v, not in range", key))
+}
+
+func (s *KeyRangeShard) EqualStart(key interface{}, index int) bool {
+	v := KeyspaceId(EncodeValue(key))
+	return s.Shards[index].Start == v
+}
+func (s *KeyRangeShard) EqualStop(key interface{}, index int) bool {
+	v := KeyspaceId(EncodeValue(key))
+	return s.Shards[index].End == v
 }
 
 type DefaultShard struct {

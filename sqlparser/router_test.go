@@ -32,7 +32,7 @@ rules:
     nodes: node1,node2,node3    
     type: range
     # range is -inf-10000 10000-20000 20000-+inf 
-    range: -0000000000002710-0000000000004e20-
+    range: -10000-20000-
 
 -   db: mixer
     table: 
@@ -161,6 +161,9 @@ func TestConditionSharding(t *testing.T) {
 
 	sql = "select * from test2 where id > -1"
 	checkSharding(t, sql, 0, 1, 2)
+
+	sql = "select * from test2 where id > -1 and id < 11000"
+	checkSharding(t, sql, 0, 1)
 }
 
 func TestValueSharding(t *testing.T) {

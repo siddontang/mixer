@@ -180,6 +180,14 @@ func (plan *RoutingPlan) shardListFromPlan() (shardList []int) {
 		return plan.fullList
 	}
 
+	//default rule will route all sql to one node
+	if plan.rule.Type == router.DefaultRuleType {
+		if len(plan.fullList) != 1 {
+			panic(NewParserError("invalid default rule nodes num %d, must 1", plan.fullList))
+		}
+		return plan.fullList
+	}
+
 	switch criteria := plan.criteria.(type) {
 	case Values:
 		index := plan.findInsertShard(criteria)
@@ -211,6 +219,7 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 
 		plan.rule = r.GetRule(String(stmt.Table))
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
+		plan.fullList = makeList(0, len(plan.rule.Nodes))
 		return plan
 
 	case *Select:
@@ -350,12 +359,12 @@ func (plan *RoutingPlan) findShard(valExpr ValExpr) int {
 func (plan *RoutingPlan) adjustShardIndex(valExpr ValExpr, index int) int {
 	value := getBoundValue(valExpr)
 
-	s, ok := plan.rule.Shard.(*router.RangeShard)
+	s, ok := plan.rule.Shard.(router.RangeShard)
 	if !ok {
 		return index
 	}
 
-	if s.Shards[index].Start == router.KeyspaceId(router.EncodeValue(value)) {
+	if s.EqualStart(value, index) {
 		index--
 		if index < 0 {
 			panic(NewParserError("invalid range sharding"))

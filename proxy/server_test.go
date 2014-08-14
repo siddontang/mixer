@@ -58,11 +58,13 @@ rules:
     key:
     nodes: node1
     type: default
+
 -   db: mixer
     table: mixer_test_shard_hash
     key: id
     nodes: node2,node3
     type: hash
+    
 -   db: mixer
     table: mixer_test_shard_range
     key: id
@@ -70,7 +72,7 @@ rules:
     nodes: node2, node3
     #node2 : (-inf, 10000)
     #node3 : [10000, +inf)
-    range: -0000000000002710-
+    range: -10000-
     type: range
 `)
 

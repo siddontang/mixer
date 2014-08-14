@@ -16,11 +16,10 @@ rules:
     type: range
 
     # range is left close and right open
-    # node1 range min-6FFFFFFFFFFFFFFF 
-    # node2 range 6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF
-    # node3 range AFFFFFFFFFFFFFFF-max
-
-    range: -6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF-
+    # node1 range (-inf, 10000)
+    # node2 range [10000, 20000)
+    # node3 range [20000, +inf)
+    range: -10000-20000-
 
 -   db: mixer
     table: 

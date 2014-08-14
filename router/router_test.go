@@ -24,10 +24,10 @@ rules:
     nodes: node1,node2,node3
     
     type: range
-    # node1 range [min, 6FFFFFFFFFFFFFFF)
-    # node2 range [6FFFFFFFFFFFFFFF, AFFFFFFFFFFFFFFF)
-    # node3 range [AFFFFFFFFFFFFFFF, max)
-    range: -6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF-
+    # node1 range (-inf, 10000)
+    # node2 range [10000, 20000)
+    # node3 range [20000, +inf)
+    range: -10000-20000-
 
 -   db: mixer
     table: 
@@ -63,9 +63,7 @@ rules:
 		t.Fatal(rangeRule.Type)
 	}
 
-	k, _ := HexKeyspaceId("7FFFFFFFFFFFFFFF").Unhex()
-
-	if n := rangeRule.FindNode(string(k)); n != "node2" {
+	if n := rangeRule.FindNode(10000); n != "node2" {
 		t.Fatal(n)
 	}
 
