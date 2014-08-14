@@ -284,6 +284,10 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 + set autocommit support
 + set name charset support
 
+## Range Rule
+
++ only support int64 number range now
+
 ## Feedback
 
 Email: siddontang@gmail.com
