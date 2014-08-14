@@ -69,11 +69,17 @@ A schema contains one or more nodes, if a client use the specified schema, any c
 
 You must set some roules for a schema to let mixer decide how to route the sql to different node to be executed.
 
-Mixer uses ```table + key``` to route. Duplicate rule for a table is not allowed.
+Mixer uses ```table + key``` to route. Duplicate rule for a table is not allowed. 
+
+When a sql needs to be routed, mixer does below step:
+
++ Parse sql and find the operated table.
++ No rule for the table, mixer use default rule.
++ Rule exists, mixer try to route it with the specified key. 
 
 Rule has three types: default, hash and range.
 
-A schema must have a default rule with only one node assigned. Any sql which can not be routed will use the default rule.
+A schema must have a default rule with only one node assigned. 
 
 For hash and range routing you can see the example below.
 
@@ -284,9 +290,14 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 + set autocommit support
 + set name charset support
 
-## Range Rule
+### Range Rule
 
 + only support int64 number range now
+
+## Caveat
+
++ Mixer uses 2PC to handle write operations for multi nodes, you may take the risk that data corrupted if some nodes commit ok but others error. In that case, you must try to recover your data by yourself.
++ You must design your routing rule and write sql carefully. (e.g. if your where condition contains no routing key, mixer will route the sql to all nodes, maybe).
 
 ## Feedback
 
