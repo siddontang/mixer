@@ -80,8 +80,7 @@ func newTestServer(t *testing.T) *Server {
 	f := func() {
 		cfg, err := config.ParseConfigData(testConfigData)
 		if err != nil {
-			println(err.Error())
-			panic(err)
+			t.Fatal(err.Error())
 		}
 
 		testServer, err = NewServer(cfg)
