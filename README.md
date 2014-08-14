@@ -1,20 +1,24 @@
 # Mixer
 
-Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using MySQL.
+Mixer is a MySQL proxy powered by Go, aims to supply a simple solution for using MySQL.
 
 ## Featrues
 
-- Supports base MySQL 
-- Splits read and write.
-- MySQL HA, switchs backup automatically if main crashed
-- Base SQL Routing
+- Supports base MySQL (select, insert, update, replace, delete).
+- Splits read and write (not full test).
+- MySQL HA, switchs backup automatically if main crashed (not full test).
+- Base SQL Routing.
 
 ## Todo
 
+- admin commands.
+- some show command support: show databases, etc.
+- some select system variable: select @@version, etc.
 - Enhance Routing Rule.
 - SQL validation check. 
 - Statistics.
 - Prepare statement.
+- Lots of ......
 
 ## Install 
 
@@ -29,6 +33,49 @@ Mixer is a MySQL proxy with Golang, aims to supply a simple solution for using M
 
     make
     make test
+
+## Keywords
+
+### proxy
+
+Proxy is the bridge connecting clients and the read mysql servers. 
+
+It acts as a mysql server too, clients can communicate with it using mysql procotol.
+
+### node
+
+Mixer uses node to represent the real remote mysql server. A node can have three mysql servers:
+
++ master, main mysql server, all write operations, read operations (if ```rw_split``` and slave not set) will be executed here.
+All transactions will be executed here too.
++ master backup, if master was down, mixer can switch over to the backup mysql server. 
++ slave, if ```rw_split``` is set, any select operations will be executed here.
+
+You can only set master for a node to use.
+
+Notice:
+
++ You can use ```admin upnode``` or ```admin downnode``` commands to up or down specified mysql server.
++ If master was down,  you must use admin command to up it manually.
++ You must set the mysql replication for yourself, mixer do not care it, maybe will support it later.
+
+### schema
+
+Schema likes mysql database, if a client executes ```use db``` command, ```db``` must be exists in schema.
+
+A schema contains one or more nodes, if a client use the specified schema, any command will be only routed to the node which belongs to the schema to be executed.
+
+### rule
+
+You must set some roules for a schema to let mixer decide how to route the sql to different node to be executed.
+
+Mixer uses ```table + key``` to route. Duplicate rule for a table is not allowed.
+
+Rule has three types: default, hash and range.
+
+A schema must have a default rule with only one node assigned. Any sql which can not be routed will use the default rule.
+
+For hash and range routing you can see the example below.
 
 ## Base Example
 
@@ -67,6 +114,8 @@ mysql> select id, str from mixer_test_conn;
 ## Hash Sharding Example
 
 ```
+hash algorithm: value % len(nodes)
+
 table: mixer_test_shard_hash
 
 Node: node2, node3
@@ -119,6 +168,8 @@ Empty set
 ## Range Sharding Example
 
 ```
+range algorithm: node key start <= value < node key stop
+
 table: mixer_test_shard_range
 
 Node: node2, node3
@@ -190,6 +241,28 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 | b    |
 +------+
 ```
+
+## Limitation
+
+### Select
+
++ join not support
++ sub select not support
+
+### Insert
+
++ insert select not support
++ multi insert values to diff nodes not support
++ insert on duplicate update set can not set the routing key
+
+### Replace
+
++ multi replace values to diff nodes not support
+
+### Set
+
++ set autocommit support
++ set name charset support
 
 ## Feedback
 
