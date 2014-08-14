@@ -12,8 +12,8 @@ Mixer is a MySQL proxy powered by Go, aims to supply a simple solution for using
 ## Todo
 
 - admin commands.
-- some show command support: show databases, etc.
-- some select system variable: select @@version, etc.
+- some show command support: ```show databases```, etc.
+- some select system variable: ```select @@version```, etc.
 - Enhance Routing Rule.
 - SQL validation check. 
 - Statistics.
@@ -46,10 +46,10 @@ It acts as a mysql server too, clients can communicate with it using mysql proco
 
 Mixer uses node to represent the real remote mysql server. A node can have three mysql servers:
 
-+ master, main mysql server, all write operations, read operations (if ```rw_split``` and slave not set) will be executed here.
++ master: main mysql server, all write operations, read operations (if ```rw_split``` and slave not set) will be executed here.
 All transactions will be executed here too.
-+ master backup, if master was down, mixer can switch over to the backup mysql server. 
-+ slave, if ```rw_split``` is set, any select operations will be executed here.
++ master backup: if master was down, mixer can switch over to the backup mysql server. 
++ slave: if ```rw_split``` is set, any select operations will be executed here.
 
 You can only set master for a node to use.
 
@@ -57,7 +57,7 @@ Notice:
 
 + You can use ```admin upnode``` or ```admin downnode``` commands to up or down specified mysql server.
 + If master was down,  you must use admin command to up it manually.
-+ You must set the mysql replication for yourself, mixer do not care it, maybe will support it later.
++ You must set the mysql replication for yourself, mixer does not care it.
 
 ### schema
 
@@ -114,6 +114,13 @@ mysql> select id, str from mixer_test_conn;
 ## Hash Sharding Example
 
 ```
+hash rule:
+-   db: mixer
+    table: mixer_test_shard_hash
+    key: id
+    nodes: node2,node3
+    type: hash
+
 hash algorithm: value % len(nodes)
 
 table: mixer_test_shard_hash
@@ -168,6 +175,15 @@ Empty set
 ## Range Sharding Example
 
 ```
+range rule:
+-   db: mixer
+    table: mixer_test_shard_range
+    key: id
+    range: 
+    nodes: node2, node3
+    range: -10000-
+    type: range
+
 range algorithm: node key start <= value < node key stop
 
 table: mixer_test_shard_range
