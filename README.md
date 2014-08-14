@@ -275,6 +275,10 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 
 + multi replace values to diff nodes not support
 
+### Update
+
++ update set can not set the routing key
+
 ### Set
 
 + set autocommit support
