@@ -84,7 +84,7 @@ For hash and range routing you can see the example below.
 mixer-proxy -config=/etc/mixer.conf
 
 #another shell
-mysql -P4000 -uroot
+mysql -uroot -h127.0.0.1 -P4000 -p -Dmixer
 
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 158
