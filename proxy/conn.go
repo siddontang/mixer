@@ -317,7 +317,7 @@ func (c *Conn) writeOK(r *Result) error {
 	data = append(data, PutLengthEncodedInt(r.InsertId)...)
 
 	if c.capability&CLIENT_PROTOCOL_41 > 0 {
-		data = append(data, byte(r.Status), byte(r.Status)>>8)
+		data = append(data, byte(r.Status), byte(r.Status>>8))
 		data = append(data, 0, 0)
 	}
 
@@ -352,7 +352,7 @@ func (c *Conn) writeEOF(status uint16) error {
 	data = append(data, EOF_HEADER)
 	if c.capability&CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, 0, 0)
-		data = append(data, byte(status), byte(status)>>8)
+		data = append(data, byte(status), byte(status>>8))
 	}
 
 	return c.writePacket(data)
