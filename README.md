@@ -11,9 +11,9 @@ Mixer is a MySQL proxy powered by Go, aims to supply a simple solution for using
 
 ## Todo
 
-- admin commands.
-- some show command support: ```show databases```, etc.
-- some select system variable: ```select @@version```, etc.
+- Some admin commands.
+- Some show command support: ```show databases```, etc.
+- Some select system variable: ```select @@version```, etc.
 - Enhance Routing Rule.
 - SQL validation check. 
 - Statistics.
