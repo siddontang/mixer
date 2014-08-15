@@ -308,6 +308,14 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 + Mixer uses 2PC to handle write operations for multi nodes, you may take the risk that data corrupted if some nodes commit ok but others error. In that case, you must try to recover your data by yourself.
 + You must design your routing rule and write sql carefully. (e.g. if your where condition contains no routing key, mixer will route the sql to all nodes, maybe).
 
+# Why not vitess?
+
+Vitess is very awesome, and I use some of its codes like sqlparser too. Why not use vitess directly? Maybe below:
+
++ Vitess is too huge for me, I need a simple proxy.
++ Vitess uses bson protocol, I want to use MySQL protocol.
++ Most likely, something has gone wrong in my head.
+
 ## Feedback
 
 Email: siddontang@gmail.com
