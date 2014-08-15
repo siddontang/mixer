@@ -6,6 +6,7 @@ import (
 	"github.com/siddontang/mixer/hack"
 	. "github.com/siddontang/mixer/mysql"
 	"github.com/siddontang/mixer/sqlparser"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -349,8 +350,68 @@ func (c *Conn) mergeSelectResult(rs []*Result, stmt *sqlparser.Select) error {
 	}
 
 	//to do order by, group by, limit offset
+	c.sortSelectResult(r, stmt)
+	//to do, add log here, sort may error because order by key not exist in resultset fields
+
+	if err := c.limitSelectResult(r, stmt); err != nil {
+		return err
+	}
 
 	return c.writeResultset(status, r)
+}
+
+func (c *Conn) sortSelectResult(r *Resultset, stmt *sqlparser.Select) error {
+	if stmt.OrderBy == nil {
+		return nil
+	}
+
+	sk := make([]SortKey, len(stmt.OrderBy))
+
+	for i, o := range stmt.OrderBy {
+		sk[i].Name = nstring(o.Expr)
+		sk[i].Direction = o.Direction
+	}
+
+	return r.Sort(sk)
+}
+
+func (c *Conn) limitSelectResult(r *Resultset, stmt *sqlparser.Select) error {
+	if stmt.Limit == nil {
+		return nil
+	}
+
+	var offset, count int64
+	var err error
+	if stmt.Limit.Offset == nil {
+		offset = 0
+	} else {
+		if o, ok := stmt.Limit.Offset.(sqlparser.NumVal); !ok {
+			return fmt.Errorf("invalid select limit %s", nstring(stmt.Limit))
+		} else {
+			if offset, err = strconv.ParseInt(hack.String([]byte(o)), 10, 64); err != nil {
+				return err
+			}
+		}
+	}
+
+	if o, ok := stmt.Limit.Rowcount.(sqlparser.NumVal); !ok {
+		return fmt.Errorf("invalid limit %s", nstring(stmt.Limit))
+	} else {
+		if count, err = strconv.ParseInt(hack.String([]byte(o)), 10, 64); err != nil {
+			return err
+		} else if count < 0 {
+			return fmt.Errorf("invalid limit %s", nstring(stmt.Limit))
+		}
+	}
+
+	if offset+count > int64(len(r.Values)) {
+		count = int64(len(r.Values)) - offset
+	}
+
+	r.Values = r.Values[offset : offset+count]
+	r.RowDatas = r.RowDatas[offset : offset+count]
+
+	return nil
 }
 
 func (c *Conn) writeResultset(status uint16, r *Resultset) error {

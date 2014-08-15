@@ -271,6 +271,14 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 
 + join not support
 + sub select not support
++ "group by" not support
++ "order by" only takes effect when "order by" key exists in select expression field.
+    
+    "select id from t1 order by id" is ok.
+    
+    "select str from t1 order by id" is not ok. Mixer does not known how to sort because it can not find proper data to compare with id.
+
++ limit should be used with "order by", otherwise you may receive wrong result.  
 
 ### Insert
 

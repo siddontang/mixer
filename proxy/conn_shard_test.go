@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"fmt"
+	"github.com/siddontang/mixer/mysql"
+	"reflect"
 	"testing"
 )
 
@@ -126,6 +128,68 @@ func TestShard_Hash(t *testing.T) {
 	testShard_Select(t, table, "id = 2 or id = 3", "c", "d")
 	testShard_Select(t, table, "id = 2 and id = 3")
 	testShard_Select(t, table, "id in (0, 1, 3)", "a", "b", "d")
+}
+
+func testExecute(t *testing.T, sql string) *mysql.Result {
+	conn := newTestDBConn(t)
+
+	r, err := conn.Execute(sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return r
+}
+
+func testShared_SelectOrderBy(t *testing.T, table string, where string, v [][]interface{}) {
+	sql := fmt.Sprintf("select id, str from %s where %s", table, where)
+
+	r := testExecute(t, sql)
+
+	if !reflect.DeepEqual(r.Values, v) {
+		t.Fatal(fmt.Sprintf("%v != %v", r.Values, v))
+	}
+}
+
+func TestShard_HashOrderByLimit(t *testing.T) {
+	table := "mixer_test_shard_hash"
+
+	testShard_Insert(t, table, "node2", 4, "a")
+	testShard_Insert(t, table, "node3", 5, "a")
+	testShard_Insert(t, table, "node2", 6, "b")
+	testShard_Insert(t, table, "node3", 7, "b")
+
+	var v [][]interface{}
+	v = [][]interface{}{
+		[]interface{}{uint64(7), []byte("b")},
+		[]interface{}{uint64(6), []byte("b")},
+		[]interface{}{uint64(5), []byte("a")},
+		[]interface{}{uint64(4), []byte("a")},
+	}
+
+	testShared_SelectOrderBy(t, table, "id in (4,5,6,7) order by id desc", v)
+
+	v = [][]interface{}{
+		[]interface{}{uint64(6), []byte("b")},
+		[]interface{}{uint64(7), []byte("b")},
+		[]interface{}{uint64(4), []byte("a")},
+		[]interface{}{uint64(5), []byte("a")},
+	}
+
+	testShared_SelectOrderBy(t, table, "id in (4,5,6,7) order by str desc, id asc", v)
+
+	v = [][]interface{}{
+		[]interface{}{uint64(6), []byte("b")},
+		[]interface{}{uint64(7), []byte("b")},
+	}
+
+	testShared_SelectOrderBy(t, table, "id in (4,5,6,7) order by str desc, id asc limit 0, 2", v)
+
+	v = [][]interface{}{
+		[]interface{}{uint64(5), []byte("a")},
+	}
+
+	testShared_SelectOrderBy(t, table, "id in (4,5,6,7) order by str desc, id asc limit 1, 2", v)
 
 }
 

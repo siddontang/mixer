@@ -3,6 +3,7 @@ package mysql
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/siddontang/mixer/hack"
 	"math"
 	"strconv"
 )
@@ -369,7 +370,7 @@ func (r *Resultset) GetString(row, column int) (string, error) {
 	case string:
 		return v, nil
 	case []byte:
-		return string(v), nil
+		return hack.String(v), nil
 	case int64:
 		return strconv.FormatInt(v, 10), nil
 	case uint64:
