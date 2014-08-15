@@ -182,6 +182,24 @@ func TestValueSharding(t *testing.T) {
 	checkSharding(t, sql, 2)
 }
 
+func TestBadUpdateExpr(t *testing.T) {
+	var sql string
+
+	r := newTestDBRule()
+
+	sql = "insert into test1 (id) values (5) on duplicate key update  id = 10"
+
+	if _, err := GetShardList(sql, r); err == nil {
+		t.Fatal("must err")
+	}
+
+	sql = "update test1 set id = 10 where id = 5"
+
+	if _, err := GetShardList(sql, r); err == nil {
+		t.Fatal("must err")
+	}
+}
+
 func testCheckList(t *testing.T, l []int, checkList ...int) {
 	if len(l) != len(checkList) {
 		t.Fatal("invalid list len", len(l), len(checkList))

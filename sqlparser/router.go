@@ -181,9 +181,10 @@ func (plan *RoutingPlan) shardListFromPlan() (shardList []int) {
 	}
 
 	//default rule will route all sql to one node
-	if plan.rule.Type == router.DefaultRuleType {
+	//if rule has one node, we also can route directly
+	if plan.rule.Type == router.DefaultRuleType || len(plan.rule.Nodes) == 1 {
 		if len(plan.fullList) != 1 {
-			panic(NewParserError("invalid default rule nodes num %d, must 1", plan.fullList))
+			panic(NewParserError("invalid rule nodes num %d, must 1", plan.fullList))
 		}
 		return plan.fullList
 	}
@@ -199,6 +200,20 @@ func (plan *RoutingPlan) shardListFromPlan() (shardList []int) {
 	}
 }
 
+func checkUpdateExprs(exprs UpdateExprs, rule *router.Rule) {
+	if rule.Type == router.DefaultRuleType {
+		return
+	} else if len(rule.Nodes) == 1 {
+		return
+	}
+
+	for _, e := range exprs {
+		if string(e.Name.Name) == rule.Key {
+			panic(NewParserError("routing key can not in update expression"))
+		}
+	}
+}
+
 func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) {
 	plan = &RoutingPlan{}
 	var where *Where
@@ -209,6 +224,11 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 		}
 
 		plan.rule = r.GetRule(String(stmt.Table))
+
+		if stmt.OnDup != nil {
+			checkUpdateExprs(UpdateExprs(stmt.OnDup), plan.rule)
+		}
+
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
 		plan.fullList = makeList(0, len(plan.rule.Nodes))
 		return plan
@@ -227,6 +247,9 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 		where = stmt.Where
 	case *Update:
 		plan.rule = r.GetRule(String(stmt.Table))
+
+		checkUpdateExprs(stmt.Exprs, plan.rule)
+
 		where = stmt.Where
 	case *Delete:
 		plan.rule = r.GetRule(String(stmt.Table))
