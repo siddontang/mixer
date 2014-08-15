@@ -2,7 +2,7 @@
 
 Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for using MySQL.
 
-## Featrues
+## Features
 
 - Supports basoc SQL statements (select, insert, update, replace, delete)
 - Supports transactions
