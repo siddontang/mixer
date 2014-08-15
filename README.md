@@ -1,25 +1,25 @@
 # Mixer
 
-Mixer is a MySQL proxy powered by Go, aims to supply a simple solution for using MySQL.
+Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for using MySQL.
 
 ## Featrues
 
-- Supports base MySQL (select, insert, update, replace, delete).
-- Supports transaction.
-- Splits read and write (not full test).
-- MySQL HA, switchs backup automatically if main crashed (not full test).
-- Base SQL Routing.
+- Supports basoc SQL statements (select, insert, update, replace, delete)
+- Supports transactions
+- Splits reads and writes (not fully tested)
+- MySQL HA, switches to backup automatically if main crashes (not fully tested)
+- Basic SQL Routing
 
-## Todo
+## TODO
 
-- Some admin commands.
-- Some show command support: ```show databases```, etc.
-- Some select system variable: ```select @@version```, etc.
-- Enhance Routing Rule.
-- SQL validation check. 
-- Statistics.
-- Prepare statement.
-- Lots of ......
+- Some admin commands
+- Some show command support, i.e. ```show databases```, etc.
+- Some select system variable, i.e. ```select @@version```, etc.
+- Enhance routing rules
+- SQL validation check s
+- Statistics
+- Prepared statements
+- Many other things ...
 
 ## Install 
 
@@ -39,46 +39,46 @@ Mixer is a MySQL proxy powered by Go, aims to supply a simple solution for using
 
 ### proxy
 
-Proxy is the bridge connecting clients and the read mysql servers. 
+A proxy is the bridge connecting clients and the real MySQL servers. 
 
-It acts as a mysql server too, clients can communicate with it using mysql procotol.
+It acts as a MySQL server too, clients can communicate with it using the MySQL procotol.
 
 ### node
 
-Mixer uses node to represent the real remote mysql server. A node can have three mysql servers:
+Mixer uses nodes to represent the real remote MySQL servers. A node can have three MySQL servers:
 
-+ master: main mysql server, all write operations, read operations (if ```rw_split``` and slave not set) will be executed here.
++ master: main MySQL server, all write operations, read operations (if ```rw_split``` and slave are not set) will be executed here.
 All transactions will be executed here too.
-+ master backup: if master was down, mixer can switch over to the backup mysql server. 
++ master backup: if the master was down, the mixer can switch over to the backup MySQL server. 
 + slave: if ```rw_split``` is set, any select operations will be executed here.
 
 You can only set master for a node to use.
 
 Notice:
 
-+ You can use ```admin upnode``` or ```admin downnode``` commands to up or down specified mysql server.
-+ If master was down,  you must use admin command to up it manually.
-+ You must set the mysql replication for yourself, mixer does not care it.
++ You can use ```admin upnode``` or ```admin downnode``` commands to bring a specified MySQL server up or down.
++ If the master was down, you must use an admin command to bring it up it manually.
++ You must set up MySQL replication for yourself, mixer does not do it.
 
 ### schema
 
-Schema likes mysql database, if a client executes ```use db``` command, ```db``` must be exists in schema.
+Schema likes MySQL database, if a client executes ```use db``` command, ```db``` must exist in the schema.
 
-A schema contains one or more nodes, if a client use the specified schema, any command will be only routed to the node which belongs to the schema to be executed.
+A schema contains one or more nodes. If a client use the specified schema, any command will be only routed to the node which belongs to the schema to be executed.
 
 ### rule
 
-You must set some roules for a schema to let mixer decide how to route the sql to different node to be executed.
+You must set some rules for a schema to let the mixer decide how to route SQL statements to different nodes to be executed.
 
-Mixer uses ```table + key``` to route. Duplicate rule for a table is not allowed. 
+Mixer uses ```table + key``` to route. Duplicate rule for a table are not allowed. 
 
-When a sql needs to be routed, mixer does below step:
+When SQL needs to be routed, mixer does the following steps:
 
-+ Parse sql and find the operated table.
-+ No rule for the table, mixer use default rule.
-+ Rule exists, mixer try to route it with the specified key. 
++ Parse SQL and find the table operated on
++ If there are no rule for the table, mixer use the default rule
++ If a rule exists, mixer tries to route it with the specified key
 
-Rule has three types: default, hash and range.
+Rules have three types: default, hash and range.
 
 A schema must have a default rule with only one node assigned. 
 
@@ -265,30 +265,30 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 +------+
 ```
 
-## Limitation
+## Limitations
 
 ### Select
 
-+ join not support
-+ sub select not support
-+ "group by" not support
-+ "order by" only takes effect when "order by" key exists in select expression field.
++ Join not supported
++ Subselects not supported
++ "group by" not supported
++ "order by" only takes effect when the "order by" key exists as a select expression field
     
     ```select id from t1 order by id``` is ok.
     
-    ```select str from t1 order by id``` is not ok, mixer does not known how to sort because it can not find proper data to compare with id.
+    ```select str from t1 order by id``` is not ok, mixer does not known how to sort because it can not find proper data to compare with `id`
 
-+ limit should be used with "order by", otherwise you may receive wrong result.  
++ Limit should be used with "order by", otherwise you may receive incorrect results
 
 ### Insert
 
-+ insert select not support
-+ multi insert values to diff nodes not support
++ insert select not supported
++ multi insert values to different nodes not supported
 + insert on duplicate update set can not set the routing key
 
 ### Replace
 
-+ multi replace values to diff nodes not support
++ multi replace values to diffed nodes not support
 
 ### Update
 
@@ -301,27 +301,25 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 
 ### Range Rule
 
-+ only support int64 number range now
++ only int64 number range supported
 
 ## Caveat
 
-+ Mixer uses 2PC to handle write operations for multi nodes, you may take the risk that data corrupted if some nodes commit ok but others error. In that case, you must try to recover your data by yourself.
-+ You must design your routing rule and write sql carefully. (e.g. if your where condition contains no routing key, mixer will route the sql to all nodes, maybe).
++ Mixer uses 2PC to handle write operations for multi nodes. You take the risk that data becomes corrupted if some nodes commit ok but others error. In that case, you must try to recover your data by yourself.
++ You must design your routing rule and write SQL carefully. (e.g. if your where condition contains no routing key, mixer will route the SQL to all nodes, maybe).
 
 ## Why not vitess?
 
-Vitess is very awesome, and I use some of its codes like sqlparser too. Why not use vitess directly? Maybe below:
+Vitess is very awesome, and I use some of its code like sqlparser. Why not use vitess directly? Maybe below:
 
-+ Vitess is too huge for me, I need a simple proxy.
-+ Vitess uses bson protocol, I want to use MySQL protocol.
-+ Most likely, something has gone wrong in my head.
++ Vitess is too huge for me, I need a simple proxy
++ Vitess uses an RPC protocol based on BSON, I want to use the MySQL protocol
++ Most likely, something has gone wrong in my head
 
 ## Status
 
-Mixer now is still in development and can not be used in production. 
+Mixer now is still in development and should not be used in production. 
 
 ## Feedback
 
 Email: siddontang@gmail.com
-
-
