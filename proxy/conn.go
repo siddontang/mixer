@@ -49,6 +49,10 @@ type Conn struct {
 
 	lastInsertId int64
 	affectedRows int64
+
+	stmtId uint32
+
+	stmts map[uint32]*Stmt
 }
 
 var baseConnId uint32 = 10000
@@ -77,6 +81,9 @@ func (s *Server) newConn(co net.Conn) *Conn {
 
 	c.collation = DEFAULT_COLLATION_ID
 	c.charset = DEFAULT_CHARSET
+
+	c.stmtId = 0
+	c.stmts = make(map[uint32]*Stmt)
 
 	return c
 }
@@ -277,16 +284,16 @@ func (c *Conn) dispatch(data []byte) error {
 		} else {
 			return c.writeOK(nil)
 		}
-	// case COM_STMT_PREPARE:
-	// 	return c.handleStmtPrepare(data)
-	// case COM_STMT_EXECUTE:
-	// 	return c.handleStmtExecute(data)
-	// case COM_STMT_CLOSE:
-	// 	return c.handleStmtClose(data)
-	// case COM_STMT_SEND_LONG_DATA:
-	// 	return c.handleStmtSendLongData(data)
-	// case COM_STMT_RESET:
-	// 	return c.handleStmtReset(data)
+	case COM_STMT_PREPARE:
+		return c.handleStmtPrepare(hack.String(data))
+	case COM_STMT_EXECUTE:
+		return c.handleStmtExecute(data)
+	case COM_STMT_CLOSE:
+		return c.handleStmtClose(data)
+	case COM_STMT_SEND_LONG_DATA:
+		return c.handleStmtSendLongData(data)
+	case COM_STMT_RESET:
+		return c.handleStmtReset(data)
 	default:
 		msg := fmt.Sprintf("command %d not supported now", cmd)
 		return NewError(ER_UNKNOWN_ERROR, msg)

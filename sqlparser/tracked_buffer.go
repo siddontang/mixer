@@ -25,7 +25,7 @@ func (err ParserError) Error() string {
 
 func handleError(err *error) {
 	if x := recover(); x != nil {
-		*err = x.(ParserError)
+		*err = x.(error)
 	}
 }
 

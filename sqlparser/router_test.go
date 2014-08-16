@@ -58,10 +58,14 @@ rules:
 	return r.GetDBRules("mixer")
 }
 
-func checkSharding(t *testing.T, sql string, checkNodeIndex ...int) {
+func checkSharding(t *testing.T, sql string, args []int, checkNodeIndex ...int) {
 	r := newTestDBRule()
 
-	ns, err := GetShardListIndex(sql, r)
+	bindVars := make(map[string]interface{}, len(args))
+	for i, v := range args {
+		bindVars[fmt.Sprintf("v%d", i+1)] = v
+	}
+	ns, err := GetShardListIndex(sql, r, bindVars)
 	if err != nil {
 		t.Fatal(sql, err)
 	} else if len(ns) != len(checkNodeIndex) {
@@ -82,106 +86,209 @@ func TestConditionSharding(t *testing.T) {
 	var sql string
 
 	sql = "select * from test1 where id = 5"
-	checkSharding(t, sql, 5)
+	checkSharding(t, sql, nil, 5)
 
 	sql = "select * from test1 where id in (5, 6)"
-	checkSharding(t, sql, 5, 6)
+	checkSharding(t, sql, nil, 5, 6)
 
 	sql = "select * from test1 where id > 5"
-	checkSharding(t, sql, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+	checkSharding(t, sql, nil, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
 	sql = "select * from test1 where id in (5, 6) and id in (5, 6, 7)"
-	checkSharding(t, sql, 5, 6)
+	checkSharding(t, sql, nil, 5, 6)
 
 	sql = "select * from test1 where id in (5, 6) or id in (5, 6, 7,8)"
-	checkSharding(t, sql, 5, 6, 7, 8)
+	checkSharding(t, sql, nil, 5, 6, 7, 8)
 
 	sql = "select * from test1 where id not in (5, 6) or id in (5, 6, 7,8)"
-	checkSharding(t, sql, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+	checkSharding(t, sql, nil, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
 	sql = "select * from test1 where id not in (5, 6)"
-	checkSharding(t, sql, 0, 1, 2, 3, 4, 7, 8, 9)
+	checkSharding(t, sql, nil, 0, 1, 2, 3, 4, 7, 8, 9)
 
 	sql = "select * from test1 where id in (5, 6) or (id in (5, 6, 7,8) and id in (1,5,7))"
-	checkSharding(t, sql, 5, 6, 7)
+	checkSharding(t, sql, nil, 5, 6, 7)
 
 	sql = "select * from test2 where id = 10000"
-	checkSharding(t, sql, 1)
+	checkSharding(t, sql, nil, 1)
 
 	sql = "select * from test2 where id between 10000 and 100000"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where id not between 1000 and 100000"
-	checkSharding(t, sql, 0, 2)
+	checkSharding(t, sql, nil, 0, 2)
 
 	sql = "select * from test2 where id not between 10000 and 100000"
-	checkSharding(t, sql, 0, 2)
+	checkSharding(t, sql, nil, 0, 2)
 
 	sql = "select * from test2 where id > 10000"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where id >= 10000"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where id <= 10000"
-	checkSharding(t, sql, 0, 1)
+	checkSharding(t, sql, nil, 0, 1)
 
 	sql = "select * from test2 where id < 10000"
-	checkSharding(t, sql, 0)
+	checkSharding(t, sql, nil, 0)
 
 	sql = "select * from test2 where  10000 < id"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where  10000 <= id"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where  10000 > id"
-	checkSharding(t, sql, 0)
+	checkSharding(t, sql, nil, 0)
 
 	sql = "select * from test2 where  10000 >= id"
-	checkSharding(t, sql, 0, 1)
+	checkSharding(t, sql, nil, 0, 1)
 
 	sql = "select * from test2 where id >= 10000 and id <= 100000"
-	checkSharding(t, sql, 1, 2)
+	checkSharding(t, sql, nil, 1, 2)
 
 	sql = "select * from test2 where (id >= 10000 and id <= 100000) or id < 100"
-	checkSharding(t, sql, 0, 1, 2)
+	checkSharding(t, sql, nil, 0, 1, 2)
 
 	sql = "select * from test2 where (id >= 10000 and id <= 100000) or (id < 100 and name > 100000)"
-	checkSharding(t, sql, 0, 1, 2)
+	checkSharding(t, sql, nil, 0, 1, 2)
 
 	sql = "select * from test2 where id in (1, 10000)"
-	checkSharding(t, sql, 0, 1)
+	checkSharding(t, sql, nil, 0, 1)
 
 	sql = "select * from test2 where id not in (1, 10000)"
-	checkSharding(t, sql, 0, 1, 2)
+	checkSharding(t, sql, nil, 0, 1, 2)
 
 	sql = "select * from test2 where id in (1000, 10000)"
-	checkSharding(t, sql, 0, 1)
+	checkSharding(t, sql, nil, 0, 1)
 
 	sql = "select * from test2 where id > -1"
-	checkSharding(t, sql, 0, 1, 2)
+	checkSharding(t, sql, nil, 0, 1, 2)
 
 	sql = "select * from test2 where id > -1 and id < 11000"
-	checkSharding(t, sql, 0, 1)
+	checkSharding(t, sql, nil, 0, 1)
+}
+
+func TestConditionVarArgSharding(t *testing.T) {
+	var sql string
+
+	sql = "select * from test1 where id = ?"
+	checkSharding(t, sql, []int{5}, 5)
+
+	sql = "select * from test1 where id in (?, ?)"
+	checkSharding(t, sql, []int{5, 6}, 5, 6)
+
+	sql = "select * from test1 where id > ?"
+	checkSharding(t, sql, []int{5}, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+	sql = "select * from test1 where id in (?, ?) and id in (?, ?, ?)"
+	checkSharding(t, sql, []int{5, 6, 5, 6, 7}, 5, 6)
+
+	sql = "select * from test1 where id in (?, ?) or id in (?, ?,?,?)"
+	checkSharding(t, sql, []int{5, 6, 5, 6, 7, 8}, 5, 6, 7, 8)
+
+	sql = "select * from test1 where id not in (?, ?) or id in (?, ?, ?,?)"
+	checkSharding(t, sql, []int{5, 6, 5, 6, 7, 8}, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+	sql = "select * from test1 where id not in (?, ?)"
+	checkSharding(t, sql, []int{5, 6}, 0, 1, 2, 3, 4, 7, 8, 9)
+
+	sql = "select * from test1 where id in (?, ?) or (id in (?, ?, ?,?) and id in (?,?,?))"
+	checkSharding(t, sql, []int{5, 6, 5, 6, 7, 8, 1, 5, 7}, 5, 6, 7)
+
+	sql = "select * from test2 where id = ?"
+	checkSharding(t, sql, []int{10000}, 1)
+
+	sql = "select * from test2 where id between ? and ?"
+	checkSharding(t, sql, []int{10000, 100000}, 1, 2)
+
+	sql = "select * from test2 where id not between ? and ?"
+	checkSharding(t, sql, []int{10000, 100000}, 0, 2)
+
+	sql = "select * from test2 where id not between ? and ?"
+	checkSharding(t, sql, []int{10000, 100000}, 0, 2)
+
+	sql = "select * from test2 where id > ?"
+	checkSharding(t, sql, []int{10000}, 1, 2)
+
+	sql = "select * from test2 where id >= ?"
+	checkSharding(t, sql, []int{10000}, 1, 2)
+
+	sql = "select * from test2 where id <= ?"
+	checkSharding(t, sql, []int{10000}, 0, 1)
+
+	sql = "select * from test2 where id < ?"
+	checkSharding(t, sql, []int{10000}, 0)
+
+	sql = "select * from test2 where  ? < id"
+	checkSharding(t, sql, []int{10000}, 1, 2)
+
+	sql = "select * from test2 where  ? <= id"
+	checkSharding(t, sql, []int{10000}, 1, 2)
+
+	sql = "select * from test2 where  ? > id"
+	checkSharding(t, sql, []int{10000}, 0)
+
+	sql = "select * from test2 where  ? >= id"
+	checkSharding(t, sql, []int{10000}, 0, 1)
+
+	sql = "select * from test2 where id >= ? and id <= ?"
+	checkSharding(t, sql, []int{10000, 100000}, 1, 2)
+
+	sql = "select * from test2 where (id >= ? and id <= ?) or id < ?"
+	checkSharding(t, sql, []int{10000, 100000, 100}, 0, 1, 2)
+
+	sql = "select * from test2 where (id >= ? and id <= ?) or (id < ? and name > ?)"
+	checkSharding(t, sql, []int{10000, 100000, 100, 100000}, 0, 1, 2)
+
+	sql = "select * from test2 where id in (?, ?)"
+	checkSharding(t, sql, []int{1, 10000}, 0, 1)
+
+	sql = "select * from test2 where id not in (?, ?)"
+	checkSharding(t, sql, []int{1, 10000}, 0, 1, 2)
+
+	sql = "select * from test2 where id in (?, ?)"
+	checkSharding(t, sql, []int{1000, 10000}, 0, 1)
+
+	sql = "select * from test2 where id > ?"
+	checkSharding(t, sql, []int{-1}, 0, 1, 2)
+
+	sql = "select * from test2 where id > ? and id < ?"
+	checkSharding(t, sql, []int{-1, 11000}, 0, 1)
 }
 
 func TestValueSharding(t *testing.T) {
 	var sql string
 
 	sql = "insert into test1 (id) values (5)"
-	checkSharding(t, sql, 5)
+	checkSharding(t, sql, nil, 5)
 
 	sql = "insert into test2 (id) values (10000)"
-	checkSharding(t, sql, 1)
+	checkSharding(t, sql, nil, 1)
 
 	sql = "insert into test2 (id) values (20000)"
-	checkSharding(t, sql, 2)
+	checkSharding(t, sql, nil, 2)
 
 	sql = "insert into test2 (id) values (200000)"
-	checkSharding(t, sql, 2)
+	checkSharding(t, sql, nil, 2)
 }
 
+func TestValueVarArgSharding(t *testing.T) {
+	var sql string
+
+	sql = "insert into test1 (id) values (?)"
+	checkSharding(t, sql, []int{5}, 5)
+
+	sql = "insert into test2 (id) values (?)"
+	checkSharding(t, sql, []int{10000}, 1)
+
+	sql = "insert into test2 (id) values (?)"
+	checkSharding(t, sql, []int{20000}, 2)
+
+	sql = "insert into test2 (id) values (?)"
+	checkSharding(t, sql, []int{200000}, 2)
+}
 func TestBadUpdateExpr(t *testing.T) {
 	var sql string
 
@@ -189,13 +296,13 @@ func TestBadUpdateExpr(t *testing.T) {
 
 	sql = "insert into test1 (id) values (5) on duplicate key update  id = 10"
 
-	if _, err := GetShardList(sql, r); err == nil {
+	if _, err := GetShardList(sql, r, nil); err == nil {
 		t.Fatal("must err")
 	}
 
 	sql = "update test1 set id = 10 where id = 5"
 
-	if _, err := GetShardList(sql, r); err == nil {
+	if _, err := GetShardList(sql, r, nil); err == nil {
 		t.Fatal("must err")
 	}
 }

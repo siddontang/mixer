@@ -29,15 +29,15 @@ func (c *Conn) handleQuery(sql string) (err error) {
 
 	switch v := stmt.(type) {
 	case *sqlparser.Select:
-		return c.handleSelect(sql, v)
+		return c.handleSelect(v, sql, nil)
 	case *sqlparser.Insert:
-		return c.handleExec(sql, stmt)
+		return c.handleExec(stmt, sql, nil)
 	case *sqlparser.Update:
-		return c.handleExec(sql, stmt)
+		return c.handleExec(stmt, sql, nil)
 	case *sqlparser.Delete:
-		return c.handleExec(sql, stmt)
+		return c.handleExec(stmt, sql, nil)
 	case *sqlparser.Replace:
-		return c.handleExec(sql, stmt)
+		return c.handleExec(stmt, sql, nil)
 	case *sqlparser.Set:
 		return c.handleSet(v)
 	case *sqlparser.Begin:
@@ -57,12 +57,12 @@ func (c *Conn) handleQuery(sql string) (err error) {
 	return nil
 }
 
-func (c *Conn) getShardList(stmt sqlparser.Statement) ([]*Node, error) {
+func (c *Conn) getShardList(stmt sqlparser.Statement, bindVars map[string]interface{}) ([]*Node, error) {
 	if c.schema == nil {
 		return nil, NewDefaultError(ER_NO_DB_ERROR)
 	}
 
-	ns, err := sqlparser.GetStmtShardList(stmt, c.schema.rule)
+	ns, err := sqlparser.GetStmtShardList(stmt, c.schema.rule, bindVars)
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +121,8 @@ func (c *Conn) getConn(n *Node, isSelect bool) (co *client.SqlConn, err error) {
 	return
 }
 
-func (c *Conn) getShardConns(stmt sqlparser.Statement) ([]*client.SqlConn, error) {
-	nodes, err := c.getShardList(stmt)
+func (c *Conn) getShardConns(stmt sqlparser.Statement, bindVars map[string]interface{}) ([]*client.SqlConn, error) {
+	nodes, err := c.getShardList(stmt, bindVars)
 	if err != nil {
 		return nil, err
 	} else if nodes == nil {
@@ -144,14 +144,14 @@ func (c *Conn) getShardConns(stmt sqlparser.Statement) ([]*client.SqlConn, error
 	return conns, err
 }
 
-func (c *Conn) executeInShard(conns []*client.SqlConn, sql string) ([]*Result, error) {
+func (c *Conn) executeInShard(conns []*client.SqlConn, sql string, args []interface{}) ([]*Result, error) {
 	var wg sync.WaitGroup
 	wg.Add(len(conns))
 
 	rs := make([]interface{}, len(conns))
 
 	f := func(rs []interface{}, i int, co *client.SqlConn) {
-		r, err := co.Execute(sql)
+		r, err := co.Execute(sql, args...)
 		if err != nil {
 			rs[i] = err
 		} else {
@@ -221,8 +221,20 @@ func (c *Conn) newEmptyResultset(stmt *sqlparser.Select) *Resultset {
 	return r
 }
 
-func (c *Conn) handleSelect(sql string, stmt *sqlparser.Select) error {
-	conns, err := c.getShardConns(stmt)
+func makeBindVars(args []interface{}) map[string]interface{} {
+	bindVars := make(map[string]interface{}, len(args))
+
+	for i, v := range args {
+		bindVars[fmt.Sprintf("v%d", i+1)] = v
+	}
+
+	return bindVars
+}
+
+func (c *Conn) handleSelect(stmt *sqlparser.Select, sql string, args []interface{}) error {
+	bindVars := makeBindVars(args)
+
+	conns, err := c.getShardConns(stmt, bindVars)
 	if err != nil {
 		return err
 	} else if conns == nil {
@@ -232,7 +244,7 @@ func (c *Conn) handleSelect(sql string, stmt *sqlparser.Select) error {
 
 	var rs []*Result
 
-	rs, err = c.executeInShard(conns, sql)
+	rs, err = c.executeInShard(conns, sql, args)
 
 	c.closeShardConns(conns, false)
 
@@ -271,8 +283,10 @@ func (c *Conn) commitShardConns(conns []*client.SqlConn) error {
 	return nil
 }
 
-func (c *Conn) handleExec(sql string, stmt sqlparser.Statement) error {
-	conns, err := c.getShardConns(stmt)
+func (c *Conn) handleExec(stmt sqlparser.Statement, sql string, args []interface{}) error {
+	bindVars := makeBindVars(args)
+
+	conns, err := c.getShardConns(stmt, bindVars)
 	if err != nil {
 		return err
 	} else if conns == nil {
@@ -282,7 +296,7 @@ func (c *Conn) handleExec(sql string, stmt sqlparser.Statement) error {
 	var rs []*Result
 
 	if len(conns) == 1 {
-		rs, err = c.executeInShard(conns, sql)
+		rs, err = c.executeInShard(conns, sql, args)
 	} else {
 		//for multi nodes, 2PC simple, begin, exec, commit
 		//if commit error, data maybe corrupt
@@ -291,7 +305,7 @@ func (c *Conn) handleExec(sql string, stmt sqlparser.Statement) error {
 				break
 			}
 
-			if rs, err = c.executeInShard(conns, sql); err != nil {
+			if rs, err = c.executeInShard(conns, sql, args); err != nil {
 				break
 			}
 

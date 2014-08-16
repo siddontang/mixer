@@ -23,6 +23,8 @@ type RoutingPlan struct {
 	criteria SQLNode
 
 	fullList []int
+
+	bindVars map[string]interface{}
 }
 
 /*
@@ -39,30 +41,32 @@ type RoutingPlan struct {
 		where id between 1 and 10
 		where id >= 1 and id < 10
 */
-func GetShardList(sql string, r *router.DBRules) (nodes []string, err error) {
+func GetShardList(sql string, r *router.DBRules, bindVars map[string]interface{}) (nodes []string, err error) {
 	var stmt Statement
 	stmt, err = Parse(sql)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetStmtShardList(stmt, r)
+	return GetStmtShardList(stmt, r, bindVars)
 }
 
-func GetShardListIndex(sql string, r *router.DBRules) (nodes []int, err error) {
+func GetShardListIndex(sql string, r *router.DBRules, bindVars map[string]interface{}) (nodes []int, err error) {
 	var stmt Statement
 	stmt, err = Parse(sql)
 	if err != nil {
 		return nil, err
 	}
 
-	return GetStmtShardListIndex(stmt, r)
+	return GetStmtShardListIndex(stmt, r, bindVars)
 }
 
-func GetStmtShardList(stmt Statement, r *router.DBRules) (nodes []string, err error) {
+func GetStmtShardList(stmt Statement, r *router.DBRules, bindVars map[string]interface{}) (nodes []string, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
+
+	plan.bindVars = bindVars
 
 	ns := plan.shardListFromPlan()
 
@@ -74,10 +78,12 @@ func GetStmtShardList(stmt Statement, r *router.DBRules) (nodes []string, err er
 	return nodes, nil
 }
 
-func GetStmtShardListIndex(stmt Statement, r *router.DBRules) (nodes []int, err error) {
+func GetStmtShardListIndex(stmt Statement, r *router.DBRules, bindVars map[string]interface{}) (nodes []int, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
+
+	plan.bindVars = bindVars
 
 	ns := plan.shardListFromPlan()
 
@@ -375,12 +381,12 @@ func (plan *RoutingPlan) findInsertShard(vals Values) int {
 }
 
 func (plan *RoutingPlan) findShard(valExpr ValExpr) int {
-	value := getBoundValue(valExpr)
+	value := plan.getBoundValue(valExpr)
 	return plan.rule.FindNodeIndex(value)
 }
 
 func (plan *RoutingPlan) adjustShardIndex(valExpr ValExpr, index int) int {
-	value := getBoundValue(valExpr)
+	value := plan.getBoundValue(valExpr)
 
 	s, ok := plan.rule.Shard.(router.RangeShard)
 	if !ok {
@@ -396,14 +402,14 @@ func (plan *RoutingPlan) adjustShardIndex(valExpr ValExpr, index int) int {
 	return index
 }
 
-func getBoundValue(valExpr ValExpr) interface{} {
+func (plan *RoutingPlan) getBoundValue(valExpr ValExpr) interface{} {
 	switch node := valExpr.(type) {
 	case ValTuple:
 		if len(node) != 1 {
 			panic(NewParserError("tuples not allowed as insert values"))
 		}
 		// TODO: Change parser to create single value tuples into non-tuples.
-		return getBoundValue(node[0])
+		return plan.getBoundValue(node[0])
 	case StrVal:
 		return string(node)
 	case NumVal:
@@ -412,6 +418,8 @@ func getBoundValue(valExpr ValExpr) interface{} {
 			panic(NewParserError("%s", err.Error()))
 		}
 		return val
+	case ValArg:
+		return plan.bindVars[string(node[1:])]
 	}
 	panic("Unexpected token")
 }
