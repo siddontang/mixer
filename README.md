@@ -1,6 +1,6 @@
 # Mixer
 
-Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for using MySQL.
+Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for MySQL sharding.
 
 ## Features
 
@@ -16,7 +16,8 @@ Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for 
 - Some show command support, i.e. ```show databases```, etc.
 - Some select system variable, i.e. ```select @@version```, etc.
 - Enhance routing rules
-- SQL validation check s
+- Monitor
+- SQL validation check
 - Statistics
 - Prepared statements
 - Many other things ...
@@ -49,15 +50,13 @@ Mixer uses nodes to represent the real remote MySQL servers. A node can have thr
 
 + master: main MySQL server, all write operations, read operations (if ```rw_split``` and slave are not set) will be executed here.
 All transactions will be executed here too.
-+ master backup: if the master was down, the mixer can switch over to the backup MySQL server. 
-+ slave: if ```rw_split``` is set, any select operations will be executed here.
-
-You can only set master for a node to use.
++ master backup: if the master was down, the mixer can switch over to the backup MySQL server. (can not set)
++ slave: if ```rw_split``` is set, any select operations will be executed here. (can not set)
 
 Notice:
 
 + You can use ```admin upnode``` or ```admin downnode``` commands to bring a specified MySQL server up or down.
-+ If the master was down, you must use an admin command to bring it up it manually.
++ If the master was down, you must use an admin command to bring it up manually.
 + You must set up MySQL replication for yourself, mixer does not do it.
 
 ### schema
@@ -269,10 +268,10 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 
 ### Select
 
-+ Join not supported
-+ Subselects not supported
-+ "group by" not supported
-+ "order by" only takes effect when the "order by" key exists as a select expression field
++ Join not supported, later only cross sharding not supported.
++ Subselects not supported, later only cross sharding not supported.
++ Cross sharding "group by" will not work ok only except the "group by" key is the routing key
++ Cross sharding "order by" only takes effect when the "order by" key exists as a select expression field
     
     ```select id from t1 order by id``` is ok.
     
@@ -282,26 +281,26 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 
 ### Insert
 
-+ insert select not supported
-+ multi insert values to different nodes not supported
-+ insert on duplicate update set can not set the routing key
++ "insert into select" not supported, later only cross sharding not supported.
++ Multi insert values to different nodes not supported
++ "insert on duplicate key update" can not set the routing key
 
 ### Replace
 
-+ multi replace values to diffed nodes not support
++ Multi replace values to different nodes not supported
 
 ### Update
 
-+ update set can not set the routing key
++ Update can not set the routing key
 
 ### Set
 
-+ set autocommit support
-+ set name charset support
++ Set autocommit support
++ Set name charset support
 
 ### Range Rule
 
-+ only int64 number range supported
++ Only int64 number range supported
 
 ## Caveat
 
