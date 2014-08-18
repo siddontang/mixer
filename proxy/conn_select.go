@@ -89,8 +89,80 @@ func formatValue(value interface{}) ([]byte, error) {
 	}
 }
 
-func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []byte) (*Resultset, error) {
+//fields must have name set
+func (c *Conn) buildResultset(fields []*Field, values [][]interface{}) (*Resultset, error) {
 	r := new(Resultset)
+
+	r.Fields = fields
+
+	var row []byte
+	var b []byte
+	var err error
+
+	for i, vs := range values {
+		if len(vs) != len(fields) {
+			return nil, fmt.Errorf("row %d has %d column not equal %d", i, len(vs), len(fields))
+		}
+
+		row = row[0:0]
+		for j, value := range vs {
+			if i == 0 {
+				field := fields[j]
+				if field.Name == nil {
+					return nil, fmt.Errorf("field %d must set name", j)
+				}
+
+				switch value.(type) {
+				case int8, int16, int32, int64, int:
+					field.Charset = 63
+					field.Type = MYSQL_TYPE_LONGLONG
+					field.Flag = BINARY_FLAG | NOT_NULL_FLAG
+				case uint8, uint16, uint32, uint64, uint:
+					field.Charset = 63
+					field.Type = MYSQL_TYPE_LONGLONG
+					field.Flag = BINARY_FLAG | NOT_NULL_FLAG | UNSIGNED_FLAG
+				case string, []byte:
+					field.Charset = 33
+					field.Type = MYSQL_TYPE_VAR_STRING
+				default:
+					return nil, fmt.Errorf("unsupport type %T for resultset", value)
+				}
+			} else {
+				switch value.(type) {
+				case int8, int16, int32, int64, int:
+					if r.Fields[j].Type != MYSQL_TYPE_LONGLONG {
+						return nil, fmt.Errorf("invalid type %T at (%d, %d), must int", value, i, j)
+					}
+				case uint8, uint16, uint32, uint64, uint:
+					if r.Fields[j].Type != MYSQL_TYPE_LONGLONG {
+						return nil, fmt.Errorf("invalid type %T at (%d, %d), must int", value, i, j)
+					}
+				case string, []byte:
+					if r.Fields[j].Type != MYSQL_TYPE_VAR_STRING {
+						return nil, fmt.Errorf("invalid type %T at (%d, %d), must string", value, i, j)
+					}
+				default:
+					return nil, fmt.Errorf("unsupport type %T for resultset", value)
+				}
+
+			}
+
+			b, err = formatValue(value)
+
+			if err != nil {
+				return nil, err
+			}
+
+			row = append(row, PutLengthEncodedString(b)...)
+		}
+
+		r.RowDatas = append(r.RowDatas, row)
+	}
+
+	return r, nil
+}
+
+func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []byte) (*Resultset, error) {
 
 	field := &Field{}
 
@@ -102,35 +174,5 @@ func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []
 
 	field.OrgName = name
 
-	var row []byte
-	var err error
-
-	switch value.(type) {
-	case int8, int16, int32, int64, int:
-		field.Charset = 63
-		field.Type = MYSQL_TYPE_LONGLONG
-		field.Flag = BINARY_FLAG | NOT_NULL_FLAG
-	case uint8, uint16, uint32, uint64, uint:
-		field.Charset = 63
-		field.Type = MYSQL_TYPE_LONGLONG
-		field.Flag = BINARY_FLAG | NOT_NULL_FLAG | UNSIGNED_FLAG
-	case string, []byte:
-		field.Charset = 33
-		field.Type = MYSQL_TYPE_VAR_STRING
-	default:
-		return nil, fmt.Errorf("unsupport type %T for resultset", value)
-	}
-
-	row, err = formatValue(value)
-
-	if err != nil {
-		return nil, err
-	}
-
-	r.Fields = []*Field{field}
-
-	r.RowDatas = append(r.RowDatas,
-		PutLengthEncodedString(row))
-
-	return r, nil
+	return c.buildResultset([]*Field{field}, [][]interface{}{[]interface{}{value}})
 }
