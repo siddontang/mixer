@@ -96,6 +96,10 @@ var (
 // Mixer admin
 %token <empty> ADMIN
 
+// Show
+%token <empty> SHOW
+%token <empty> DATABASES
+
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
 %token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING
@@ -153,6 +157,7 @@ var (
 
 %type <statement> begin_statement commit_statement rollback_statement
 %type <statement> replace_statement
+%type <statement> show_statement
 %type <statement> admin_statement
 
 %%
@@ -180,6 +185,7 @@ command:
 | commit_statement
 | rollback_statement
 | replace_statement
+| show_statement
 | admin_statement
 
 select_statement:
@@ -274,6 +280,12 @@ admin_statement:
   ADMIN sql_id '(' value_expression_list ')'
   {
     $$ = &Admin{Name : $2, Values : $4}
+  }
+
+show_statement:
+  SHOW DATABASES 
+  {
+    $$ = &Show{Name: "databases"}
   }
 
 create_statement:

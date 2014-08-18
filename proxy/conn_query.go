@@ -48,6 +48,8 @@ func (c *Conn) handleQuery(sql string) (err error) {
 		return c.handleRollback()
 	case *sqlparser.SimpleSelect:
 		return c.handleSimpleSelect(sql, v)
+	case *sqlparser.Show:
+		return c.handleShow(sql, v)
 	case *sqlparser.Admin:
 		return c.handleAdmin(v)
 	default:

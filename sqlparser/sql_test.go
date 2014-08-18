@@ -31,4 +31,13 @@ func TestAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	sql = "show databases"
+
+	_, err = Parse(sql)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }

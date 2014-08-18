@@ -110,19 +110,18 @@ func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []
 		field.Charset = 63
 		field.Type = MYSQL_TYPE_LONGLONG
 		field.Flag = BINARY_FLAG | NOT_NULL_FLAG
-		row, err = formatValue(value)
 	case uint8, uint16, uint32, uint64, uint:
 		field.Charset = 63
 		field.Type = MYSQL_TYPE_LONGLONG
 		field.Flag = BINARY_FLAG | NOT_NULL_FLAG | UNSIGNED_FLAG
-		row, err = formatValue(value)
 	case string, []byte:
 		field.Charset = 33
 		field.Type = MYSQL_TYPE_VAR_STRING
-		row, err = formatValue(value)
 	default:
 		return nil, fmt.Errorf("unsupport type %T for resultset", value)
 	}
+
+	row, err = formatValue(value)
 
 	if err != nil {
 		return nil, err
