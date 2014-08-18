@@ -1,7 +1,7 @@
 package config
 
 import (
-	"gopkg.in/yaml.v1"
+	"github.com/siddontang/go-yaml/yaml"
 	"io/ioutil"
 )
 
