@@ -12,7 +12,9 @@ func (c *Conn) handleAdmin(admin *sqlparser.Admin) error {
 	var err error
 	switch strings.ToLower(name) {
 	case "upnode":
+		err = c.adminUpNodeServer(admin.Values)
 	case "downnode":
+		err = c.adminDownNodeServer(admin.Values)
 	default:
 		return fmt.Errorf("admin %s not supported now", name)
 	}
