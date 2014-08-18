@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"strings"
 	"github.com/siddontang/mixer/config"
 	"github.com/siddontang/mixer/proxy"
+	"github.com/siddontang/go-log/log"
 	"os"
 	"os/signal"
 	"runtime"
@@ -11,6 +13,7 @@ import (
 )
 
 var configFile = flag.String("config", "/etc/mixer.conf", "mixer proxy config file")
+var logLevel *string = flag.String("l", "[debug|info|warn|error]", "log level")
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -27,7 +30,13 @@ func main() {
 		println(err.Error())
 		return
 	}
-
+	
+	if *logLevel != "" {
+		setLogLevel(*logLevel)
+	} else {
+		setLogLevel(cfg.LogLevel)
+	}
+	
 	var svr *proxy.Server
 	svr, err = proxy.NewServer(cfg)
 	if err != nil {
@@ -49,4 +58,15 @@ func main() {
 	}()
 
 	svr.Run()
+}
+
+func setLogLevel(level string){
+	switch strings.ToLower(level) {
+	case "debug":log.SetLevel(log.LevelDebug)
+	case "info":log.SetLevel(log.LevelInfo)
+	case "warn":log.SetLevel(log.LevelWarn)
+	case "error":log.SetLevel(log.LevelError)
+	default:
+		log.SetLevel(log.LevelError)
+	}
 }

@@ -83,6 +83,15 @@ A schema must have a default rule with only one node assigned.
 
 For hash and range routing you can see the example below.
 
+## admin
+
+Mixer suplies `admin` statement to administrate. The `admin` format is `admin func(arg, ...)` like `select func(arg,...)`. Later we may add admin password for safe use.
+
+Support admin functions now:
+
+    + ```admin upnode(node, serverype, addr)```
+    + ```admin downnode(node, servertype)```
+
 ## Base Example
 
 ```
