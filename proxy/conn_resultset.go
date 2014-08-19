@@ -66,7 +66,6 @@ func (c *Conn) buildResultset(names []string, values [][]interface{}) (*Resultse
 
 	r.Fields = make([]*Field, len(names))
 
-	var row []byte
 	var b []byte
 	var err error
 
@@ -75,7 +74,7 @@ func (c *Conn) buildResultset(names []string, values [][]interface{}) (*Resultse
 			return nil, fmt.Errorf("row %d has %d column not equal %d", i, len(vs), len(r.Fields))
 		}
 
-		row = row[0:0]
+		var row []byte
 		for j, value := range vs {
 			if i == 0 {
 				field := &Field{}

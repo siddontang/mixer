@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"github.com/siddontang/mixer/config"
+	"strings"
 )
 
 type Rule struct {
@@ -26,7 +27,7 @@ func (r *Rule) FindNodeIndex(key interface{}) int {
 }
 
 func (r *Rule) String() string {
-	return fmt.Sprintf("%s:%s", r.DB, r.Table)
+	return fmt.Sprintf("%s.%s(%s)?shard=%s", r.DB, r.Table, r.Key, r.Type)
 }
 
 type DBRules struct {
@@ -56,7 +57,12 @@ func (r *DBRules) GetRule(table string) *Rule {
 }
 
 func (r *DBRules) String() string {
-	return r.DB
+	var rules []string
+
+	for _, rule := range r.Rules {
+		rules = append(rules, rule.String())
+	}
+	return strings.Join(rules, "; ")
 }
 
 type Router struct {
