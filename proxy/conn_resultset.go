@@ -78,7 +78,8 @@ func (c *Conn) buildResultset(names []string, values [][]interface{}) (*Resultse
 		row = row[0:0]
 		for j, value := range vs {
 			if i == 0 {
-				field := r.Fields[j]
+				field := &Field{}
+				r.Fields[j] = field
 				field.Name = hack.Slice(names[j])
 
 				if err = formatField(field, value); err != nil {
