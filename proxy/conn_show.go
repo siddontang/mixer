@@ -12,7 +12,7 @@ import (
 func (c *Conn) handleShow(sql string, stmt *sqlparser.Show) error {
 	var err error
 	var r *Resultset
-	switch strings.ToLower(stmt.Name) {
+	switch strings.ToLower(stmt.Section) {
 	case "databases":
 		r, err = c.handleShowDatabases()
 	case "tables":
