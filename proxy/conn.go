@@ -216,7 +216,7 @@ func (c *Conn) readHandshakeResponse() error {
 	checkAuth := CalcPassword(c.salt, []byte(c.server.cfg.Password))
 
 	if !bytes.Equal(auth, checkAuth) {
-		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.c.RemoteAddr().String(), c.user)
+		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.c.RemoteAddr().String(), c.user, "Yes")
 	}
 
 	pos += authLen
@@ -265,6 +265,10 @@ func (c *Conn) Run() {
 			}
 		}
 
+		if c.closed {
+			return
+		}
+
 		c.pkg.Sequence = 0
 	}
 }
@@ -274,6 +278,9 @@ func (c *Conn) dispatch(data []byte) error {
 	data = data[1:]
 
 	switch cmd {
+	case COM_QUIT:
+		c.Close()
+		return nil
 	case COM_QUERY:
 		return c.handleQuery(hack.String(data))
 	case COM_PING:
@@ -284,6 +291,8 @@ func (c *Conn) dispatch(data []byte) error {
 		} else {
 			return c.writeOK(nil)
 		}
+	case COM_FIELD_LIST:
+		return c.handleFieldList(data)
 	case COM_STMT_PREPARE:
 		return c.handleStmtPrepare(hack.String(data))
 	case COM_STMT_EXECUTE:

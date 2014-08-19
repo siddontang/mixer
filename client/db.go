@@ -132,7 +132,7 @@ func (db *DB) PopConn() (co *Conn, err error) {
 func (db *DB) PushConn(co *Conn, err error) {
 	var closeConn *Conn = nil
 
-	if err == ErrBadConn {
+	if err != nil {
 		closeConn = co
 	} else {
 		if db.idleConns > 0 {
@@ -167,7 +167,7 @@ type SqlConn struct {
 
 func (p *SqlConn) Close() {
 	if p.Conn != nil {
-		p.db.PushConn(p.Conn, nil)
+		p.db.PushConn(p.Conn, p.Conn.pkgErr)
 		p.Conn = nil
 	}
 }

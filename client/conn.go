@@ -35,6 +35,8 @@ type Conn struct {
 	salt      []byte
 
 	lastPing int64
+
+	pkgErr error
 }
 
 func (c *Conn) Connect(addr string, user string, password string, db string) error {
@@ -109,11 +111,15 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) readPacket() ([]byte, error) {
-	return c.pkg.ReadPacket()
+	d, err := c.pkg.ReadPacket()
+	c.pkgErr = err
+	return d, err
 }
 
 func (c *Conn) writePacket(data []byte) error {
-	return c.pkg.WritePacket(data)
+	err := c.pkg.WritePacket(data)
+	c.pkgErr = err
+	return err
 }
 
 func (c *Conn) readInitialHandshake() error {
@@ -398,6 +404,40 @@ func (c *Conn) SetCharset(charset string) error {
 		c.collation = cid
 		return nil
 	}
+}
+
+func (c *Conn) FieldList(table string, wildcard string) ([]*Field, error) {
+	if err := c.writeCommandStrStr(COM_FIELD_LIST, table, wildcard); err != nil {
+		return nil, err
+	}
+
+	data, err := c.readPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	fs := make([]*Field, 0, 4)
+	var f *Field
+	if data[0] == ERR_HEADER {
+		return nil, c.handleErrorPacket(data)
+	} else {
+		for {
+			if data, err = c.readPacket(); err != nil {
+				return nil, err
+			}
+
+			// EOF Packet
+			if c.isEOFPacket(data) {
+				return fs, nil
+			}
+
+			if f, err = FieldData(data).Parse(); err != nil {
+				return nil, err
+			}
+			fs = append(fs, f)
+		}
+	}
+	return nil, fmt.Errorf("field list error")
 }
 
 func (c *Conn) exec(query string) (*Result, error) {
