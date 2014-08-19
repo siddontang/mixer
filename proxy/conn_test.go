@@ -307,6 +307,10 @@ func TestConn_LastInsertId(t *testing.T) {
 	if r, err := c.Execute(`select last_insert_id()`); err != nil {
 		t.Fatal(err)
 	} else {
+		if r.ColumnNumber() != 1 {
+			t.Fatal(r.ColumnNumber())
+		}
+
 		if v, _ := r.GetUint(0, 0); v != lastId {
 			t.Fatal(v)
 		}

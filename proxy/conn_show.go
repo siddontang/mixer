@@ -34,7 +34,7 @@ func (c *Conn) handleShowDatabases() (*Resultset, error) {
 		dbs = append(dbs, key)
 	}
 
-	return c.buildShowResult(dbs, "Database")
+	return c.buildShowResultset(dbs, "Database")
 }
 
 func (c *Conn) handleShowTables(sql string, stmt *sqlparser.Show) (*Resultset, error) {
@@ -82,10 +82,10 @@ func (c *Conn) handleShowTables(sql string, stmt *sqlparser.Show) (*Resultset, e
 		values[i] = tables[i]
 	}
 
-	return c.buildShowResult(values, fmt.Sprintf("Tables_in_%s", s.db))
+	return c.buildShowResultset(values, fmt.Sprintf("Tables_in_%s", s.db))
 }
 
-func (c *Conn) buildShowResult(values []interface{}, name string) (*Resultset, error) {
+func (c *Conn) buildShowResultset(values []interface{}, name string) (*Resultset, error) {
 
 	r := new(Resultset)
 
