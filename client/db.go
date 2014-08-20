@@ -5,6 +5,7 @@ import (
 	"fmt"
 	. "github.com/siddontang/mixer/mysql"
 	"sync"
+	"sync/atomic"
 )
 
 type DB struct {
@@ -16,7 +17,9 @@ type DB struct {
 	db           string
 	maxIdleConns int
 
-	conns *list.List
+	idleConns *list.List
+
+	connNum int32
 }
 
 func Open(addr string, user string, password string, dbName string) (*DB, error) {
@@ -27,7 +30,8 @@ func Open(addr string, user string, password string, dbName string) (*DB, error)
 	db.password = password
 	db.db = dbName
 
-	db.conns = list.New()
+	db.idleConns = list.New()
+	db.connNum = 0
 
 	return db, nil
 }
@@ -45,10 +49,10 @@ func (db *DB) Close() error {
 	db.Lock()
 
 	for {
-		if db.conns.Len() > 0 {
-			v := db.conns.Back()
+		if db.idleConns.Len() > 0 {
+			v := db.idleConns.Back()
 			co := v.Value.(*Conn)
-			db.conns.Remove(v)
+			db.idleConns.Remove(v)
 
 			co.Close()
 
@@ -73,8 +77,16 @@ func (db *DB) Ping() error {
 	return err
 }
 
-func (db *DB) SetIdleConns(num int) {
+func (db *DB) SetMaxIdleConnNum(num int) {
 	db.maxIdleConns = num
+}
+
+func (db *DB) GetIdleConnNum() int {
+	return db.idleConns.Len()
+}
+
+func (db *DB) GetConnNum() int {
+	return int(db.connNum)
 }
 
 func (db *DB) newConn() (*Conn, error) {
@@ -115,10 +127,10 @@ func (db *DB) tryReuse(co *Conn) error {
 
 func (db *DB) PopConn() (co *Conn, err error) {
 	db.Lock()
-	if db.conns.Len() > 0 {
-		v := db.conns.Front()
+	if db.idleConns.Len() > 0 {
+		v := db.idleConns.Front()
 		co = v.Value.(*Conn)
-		db.conns.Remove(v)
+		db.idleConns.Remove(v)
 	}
 	db.Unlock()
 
@@ -132,7 +144,11 @@ func (db *DB) PopConn() (co *Conn, err error) {
 		co.Close()
 	}
 
-	return db.newConn()
+	co, err = db.newConn()
+	if err == nil {
+		atomic.AddInt32(&db.connNum, 1)
+	}
+	return
 }
 
 func (db *DB) PushConn(co *Conn, err error) {
@@ -144,13 +160,13 @@ func (db *DB) PushConn(co *Conn, err error) {
 		if db.maxIdleConns > 0 {
 			db.Lock()
 
-			if db.conns.Len() >= db.maxIdleConns {
-				v := db.conns.Front()
+			if db.idleConns.Len() >= db.maxIdleConns {
+				v := db.idleConns.Front()
 				closeConn = v.Value.(*Conn)
-				db.conns.Remove(v)
+				db.idleConns.Remove(v)
 			}
 
-			db.conns.PushBack(co)
+			db.idleConns.PushBack(co)
 
 			db.Unlock()
 
@@ -161,6 +177,8 @@ func (db *DB) PushConn(co *Conn, err error) {
 	}
 
 	if closeConn != nil {
+		atomic.AddInt32(&db.connNum, -1)
+
 		closeConn.Close()
 	}
 }

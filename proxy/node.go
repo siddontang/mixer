@@ -138,7 +138,7 @@ func (n *Node) openDB(addr string) (*client.DB, error) {
 		return nil, err
 	}
 
-	db.SetIdleConns(n.cfg.IdleConns)
+	db.SetMaxIdleConnNum(n.cfg.IdleConns)
 	return db, nil
 }
 

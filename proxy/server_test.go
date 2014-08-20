@@ -109,7 +109,7 @@ func newTestDB(t *testing.T) *client.DB {
 			t.Fatal(err)
 		}
 
-		testDB.SetIdleConns(4)
+		testDB.SetMaxIdleConnNum(4)
 	}
 
 	testDBOnce.Do(f)
