@@ -83,14 +83,15 @@ A schema must have a default rule with only one node assigned.
 
 For hash and range routing you can see the example below.
 
-## admin
+## admin commands
 
 Mixer suplies `admin` statement to administrate. The `admin` format is `admin func(arg, ...)` like `select func(arg,...)`. Later we may add admin password for safe use.
 
 Support admin functions now:
 
-    + ```admin upnode(node, serverype, addr)```
-    + ```admin downnode(node, servertype)```
+    - admin upnode(node, serverype, addr);
+    - admin downnode(node, servertype);
+    - show proxy config;
 
 ## Base Example
 
@@ -129,12 +130,18 @@ mysql> select id, str from mixer_test_conn;
 ## Hash Sharding Example
 
 ```
-hash rule:
--   db: mixer
-    table: mixer_test_shard_hash
-    key: id
-    nodes: node2,node3
-    type: hash
+schemas :
+-
+  db : mixer
+  nodes: [node1, node2, node3]
+  rules:
+    default: node1
+    shard:
+      -   
+        table: mixer_test_shard_hash
+        key: id
+        nodes: [node2, node3]
+        type: hash
 
 hash algorithm: value % len(nodes)
 
@@ -316,7 +323,7 @@ proxy> select str from mixer_test_shard_range where id >=0 and id < 100000;
 + Mixer uses 2PC to handle write operations for multi nodes. You take the risk that data becomes corrupted if some nodes commit ok but others error. In that case, you must try to recover your data by yourself.
 + You must design your routing rule and write SQL carefully. (e.g. if your where condition contains no routing key, mixer will route the SQL to all nodes, maybe).
 
-## Why not vitess?
+## Why not [vitess](https://github.com/youtube/vitess)?
 
 Vitess is very awesome, and I use some of its code like sqlparser. Why not use vitess directly? Maybe below:
 
@@ -330,4 +337,4 @@ Mixer now is still in development and should not be used in production.
 
 ## Feedback
 
-Email: siddontang@gmail.com
+Email: <siddontang@gmail.com>, <chuantong.huang@gmail.com>

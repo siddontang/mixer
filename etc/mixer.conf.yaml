@@ -15,7 +15,7 @@ nodes :
 - 
     name : node1 
 
-    # default idle conns for mysql server
+    # default max idle conns for mysql server
     idle_conns : 16
 
     # if rw_split is true, select will use slave server
@@ -40,10 +40,8 @@ nodes :
 
 -
     name : node2 
-
     user: root 
     password: 
-
     master : 127.0.0.1:3308
 
 
@@ -53,36 +51,24 @@ schemas :
     db : mixer 
     nodes: [node1, node2]
 
+    # rule defines how sql executed in nodes
+    rules:
+        # any other table not set above will use default [node1]
+        default: node1
+        shard:
+        -   
+            table: test1 
+            key: id
+            type: hash
+            # node will be node1, node2
+            nodes: [node1, node2]
 
-# rule defines how sql executed in nodes
-rules:
--
-    db: mixer
-    table: test1 
-    key: id
-    type: hash
-    # node will be node1, node2
-    nodes: node(1-2)
-
--
-    db: mixer
-    table: test2 
-    key: name
-    nodes: node1,node2
-
-    type: range
-
-    # range is left close and right open
-    # node1 range (-inf, 10000)
-    # node2 range [10000, 20000)
-
-    range: -10000-
-
--   
-    db: mixer
-    table: 
-    key:
-    nodes: node1
-
-    # any other table not set above will use default rule
-    type: default
+        -
+            table: test2 
+            key: name
+            nodes: [node1, node2]
+            type: range
+            # range is left close and right open
+            # node1 range (-inf, 10000)
+            # node2 range [10000, 20000)
+            range: -10000-
