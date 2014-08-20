@@ -175,9 +175,7 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 		}
 	}
 
-	var r, err = c.buildResultset(names, values)
-
-	return r, err
+	return c.buildResultset(names, values)
 }
 
 func (c *Conn) handleShowProxyStatus(sql string, stmt *sqlparser.Show) (*Resultset, error) {

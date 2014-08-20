@@ -10,11 +10,11 @@ import (
 type DB struct {
 	sync.Mutex
 
-	addr      string
-	user      string
-	password  string
-	db        string
-	idleConns int
+	addr         string
+	user         string
+	password     string
+	db           string
+	maxIdleConns int
 
 	conns *list.List
 }
@@ -37,8 +37,8 @@ func (db *DB) Addr() string {
 }
 
 func (db *DB) ConfigString() string {
-	return fmt.Sprintf("%s:%s@%s/%s?idleConns=%v&conns=%v",
-		db.user, db.password, db.addr, db.db, db.idleConns, db.conns.Len())
+	return fmt.Sprintf("%s:%s@%s/%s?maxIdleConns=%v",
+		db.user, db.password, db.addr, db.db, db.maxIdleConns)
 }
 
 func (db *DB) Close() error {
@@ -74,7 +74,7 @@ func (db *DB) Ping() error {
 }
 
 func (db *DB) SetIdleConns(num int) {
-	db.idleConns = num
+	db.maxIdleConns = num
 }
 
 func (db *DB) newConn() (*Conn, error) {
@@ -141,10 +141,10 @@ func (db *DB) PushConn(co *Conn, err error) {
 	if err != nil {
 		closeConn = co
 	} else {
-		if db.idleConns > 0 {
+		if db.maxIdleConns > 0 {
 			db.Lock()
 
-			if db.conns.Len() >= db.idleConns {
+			if db.conns.Len() >= db.maxIdleConns {
 				v := db.conns.Front()
 				closeConn = v.Value.(*Conn)
 				db.conns.Remove(v)
