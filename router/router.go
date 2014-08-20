@@ -27,12 +27,17 @@ func (r *Rule) FindNodeIndex(key interface{}) int {
 }
 
 func (r *Rule) String() string {
-	return fmt.Sprintf("%s.%s(%s)?shard=%s", r.DB, r.Table, r.Key, r.Type)
+	return fmt.Sprintf("%s.%s?key=%v&shard=%s", r.DB, r.Table, r.Key, r.Type)
+}
+
+func (r *Rule) ConfigString() string {
+	return fmt.Sprintf("%s.%s?key=%v&shard=%s&nodes=%s",
+		r.DB, r.Table, r.Key, r.Type, strings.Join(r.Nodes, ", "))
 }
 
 type DBRules struct {
 	DB          string
-	Rules       map[string]*Rule
+	Rules       map[string]*Rule //key is <table name>
 	DefaultRule *Rule
 }
 
@@ -57,12 +62,7 @@ func (r *DBRules) GetRule(table string) *Rule {
 }
 
 func (r *DBRules) String() string {
-	var rules []string
-
-	for _, rule := range r.Rules {
-		rules = append(rules, rule.String())
-	}
-	return strings.Join(rules, "; ")
+	return r.DB
 }
 
 type Router struct {

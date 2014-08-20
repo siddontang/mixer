@@ -36,7 +36,7 @@ func (db *DB) Addr() string {
 	return db.addr
 }
 
-func (db *DB) String() string {
+func (db *DB) ConfigString() string {
 	return fmt.Sprintf("%s:%s@%s/%s?idleConns=%v&conns=%v",
 		db.user, db.password, db.addr, db.db, db.idleConns, db.conns.Len())
 }

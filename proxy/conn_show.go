@@ -109,21 +109,15 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 	var names []string = []string{"Section", "Key", "Value"}
 	var rows [][]string
 	const (
-		Section = 0
-		Key     = 1
-		Value   = 2
-		Column  = 3
+		Column = 3
 	)
 
 	rows = append(rows, []string{"Global_Config", "Addr", c.server.cfg.Addr})
 	rows = append(rows, []string{"Global_Config", "User", c.server.cfg.User})
 	rows = append(rows, []string{"Global_Config", "Password", c.server.cfg.Password})
 	rows = append(rows, []string{"Global_Config", "LogLevel", c.server.cfg.LogLevel})
-
 	rows = append(rows, []string{"Global_Config", "Schemas_Count", fmt.Sprintf("%d", len(c.server.schemas))})
 	rows = append(rows, []string{"Global_Config", "Nodes_Count", fmt.Sprintf("%d", len(c.server.nodes))})
-
-	// var row []string = make([]string, Column)
 
 	for db, schema := range c.server.schemas {
 		rows = append(rows, []string{"Schemas", "DB", db})
@@ -135,14 +129,14 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 			var nodeSection = fmt.Sprintf("Schemas[%s]-Node[ %v ]", db, name)
 
 			if node.master != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Master", node.master.String()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Master", node.master.ConfigString()})
 			}
 			if node.masterBackup != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Master_Backup", node.masterBackup.String()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Master_Backup", node.masterBackup.ConfigString()})
 			}
 
 			if node.slave != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Slave", node.slave.String()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Slave", node.slave.ConfigString()})
 			}
 			nodeRows = append(nodeRows, []string{nodeSection, "Last_Master_Ping", fmt.Sprintf("%v", time.Unix(node.lastMasterPing, 0))})
 
@@ -152,7 +146,20 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 
 		}
 		rows = append(rows, []string{fmt.Sprintf("Schemas[%s]", db), "Nodes_List", strings.Join(nodeNames, ",")})
-		rows = append(rows, []string{fmt.Sprintf("Schemas[%s]", db), "Rule", schema.rule.String()})
+
+		var defaultRule = schema.rule.DefaultRule
+		if defaultRule.DB == db {
+			if defaultRule.DB == db {
+				rows = append(rows, []string{fmt.Sprintf("Schemas[%s]_Rule_Default", db),
+					"Default_Table", defaultRule.ConfigString()})
+			}
+		}
+		for tb, r := range schema.rule.Rules {
+			if r.DB == db {
+				rows = append(rows, []string{fmt.Sprintf("Schemas[%s]_Rule_Table", db),
+					fmt.Sprintf("Table[ %s ]", tb), r.ConfigString()})
+			}
+		}
 
 		for i := range nodeRows {
 			rows = append(rows, nodeRows[i])
