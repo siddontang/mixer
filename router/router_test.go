@@ -8,72 +8,72 @@ import (
 
 func TestParseRule(t *testing.T) {
 	var s = `
-rules:
+schemas :
 -
-    db: mixer
-    table: test1 
-    key: id
-    # node will be node1, node2, ... node10
-    type: hash
-    nodes: node(1-10)
+  db : mixer
+  nodes: [node1, node2, node3]
+  rules:
+    default: node1
+    shard:
+      -   
+        table: mixer_test_shard_hash
+        key: id
+        nodes: [node2, node3]
+        type: hash
 
--
-    db: mixer
-    table: test2 
-    key: name
-    nodes: node1,node2,node3
-    
-    type: range
-    # node1 range (-inf, 10000)
-    # node2 range [10000, 20000)
-    # node3 range [20000, +inf)
-    range: -10000-20000-
-
--   db: mixer
-    table: 
-    key:
-    nodes: node1
-    type: default
+      -   
+        table: mixer_test_shard_range
+        key: id
+        type: range
+        nodes: [node2, node3]
+        range: -10000-
 `
 	var cfg config.Config
 	if err := yaml.Unmarshal([]byte(s), &cfg); err != nil {
 		t.Fatal(err)
 	}
 
-	rt, err := NewRouter(&cfg)
+	rt, err := NewRouter(&cfg.Schemas[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if r := rt.GetDBRules("mixer"); r == nil {
-		t.Fatal("must not nil")
+	if rt.DefaultRule.Nodes[0] != "node1" {
+		t.Fatal("default rule parse not correct.")
 	}
 
-	hashRule := rt.GetRule("mixer", "test1")
+	hashRule := rt.GetRule("mixer_test_shard_hash")
 	if hashRule.Type != HashRuleType {
 		t.Fatal(hashRule.Type)
 	}
 
-	if n := hashRule.FindNode(uint64(11)); n != "node2" {
+	if len(hashRule.Nodes) != 2 || hashRule.Nodes[0] != "node2" || hashRule.Nodes[1] != "node3" {
+		t.Fatal("parse nodes not correct.")
+	}
+
+	if n := hashRule.FindNode(uint64(11)); n != "node3" {
 		t.Fatal(n)
 	}
 
-	rangeRule := rt.GetRule("mixer", "test2")
+	rangeRule := rt.GetRule("mixer_test_shard_range")
 	if rangeRule.Type != RangeRuleType {
 		t.Fatal(rangeRule.Type)
 	}
 
-	if n := rangeRule.FindNode(10000); n != "node2" {
+	if n := rangeRule.FindNode(10000 - 1); n != "node2" {
 		t.Fatal(n)
 	}
 
-	defaultRule := rt.GetRule("mixer", "test3")
+	defaultRule := rt.GetRule("mixer_defaultRule_table")
 	if defaultRule == nil {
 		t.Fatal("must not nil")
 	}
 
 	if defaultRule.Type != DefaultRuleType {
 		t.Fatal(defaultRule.Type)
+	}
+
+	if defaultRule.Shard == nil {
+		t.Fatal("nil error")
 	}
 
 	if n := defaultRule.FindNode(11); n != "node1" {

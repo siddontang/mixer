@@ -10,64 +10,42 @@ type Schema struct {
 
 	nodes map[string]*Node
 
-	rule *router.DBRules
+	rule *router.Router
 }
 
 func (s *Server) parseSchemas() error {
-	r, err := router.NewRouter(s.cfg)
-	if err != nil {
-		return err
-	}
-
 	s.schemas = make(map[string]*Schema)
 
-	for _, v := range s.cfg.Schemas {
-		if _, ok := s.schemas[v.DB]; ok {
-			return fmt.Errorf("duplicate schema %s", v.DB)
+	for _, schemaCfg := range s.cfg.Schemas {
+		if _, ok := s.schemas[schemaCfg.DB]; ok {
+			return fmt.Errorf("duplicate schema [%s].", schemaCfg.DB)
 		}
-
-		if len(v.Nodes) == 0 {
-			return fmt.Errorf("schema %s must have a node", v.DB)
+		if len(schemaCfg.Nodes) == 0 {
+			return fmt.Errorf("schema [%s] must have a node.", schemaCfg.DB)
 		}
 
 		nodes := make(map[string]*Node)
-		for _, n := range v.Nodes {
+		for _, n := range schemaCfg.Nodes {
 			if s.getNode(n) == nil {
-				return fmt.Errorf("schema %s node %s is not exists", v.DB, n)
+				return fmt.Errorf("schema [%s] node [%s] config is not exists.", schemaCfg.DB, n)
 			}
 
 			if _, ok := nodes[n]; ok {
-				return fmt.Errorf("schema %s node %s duplicate", v.DB, n)
+				return fmt.Errorf("schema [%s] node [%s] duplicate.", schemaCfg.DB, n)
 			}
 
 			nodes[n] = s.getNode(n)
 		}
 
-		dbRules := r.GetDBRules(v.DB)
-		if dbRules == nil {
-			if len(v.Nodes) != 1 {
-				return fmt.Errorf("schema %s must be set a rule for multi nodes %v", v.DB, v.Nodes)
-			} else {
-				dbRules = router.NewDefaultDBRules(v.DB, v.Nodes[0])
-			}
+		rule, err := router.NewRouter(&schemaCfg)
+		if err != nil {
+			return err
 		}
 
-		for _, v := range dbRules.Rules {
-			for _, n := range v.Nodes {
-				if s.getNode(n) == nil {
-					return fmt.Errorf("rule %s node %s is not exists", v, n)
-				}
-			}
-		}
-
-		if s.getNode(dbRules.DefaultRule.Nodes[0]) == nil {
-			return fmt.Errorf("rule %s node %s is not exists", v, dbRules.DefaultRule.Nodes[0])
-		}
-
-		s.schemas[v.DB] = &Schema{
-			db:    v.DB,
+		s.schemas[schemaCfg.DB] = &Schema{
+			db:    schemaCfg.DB,
 			nodes: nodes,
-			rule:  dbRules,
+			rule:  rule,
 		}
 	}
 

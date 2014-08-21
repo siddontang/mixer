@@ -302,7 +302,7 @@ func (s *Server) DownMaster(node string) error {
 func (s *Server) DownMasterBackup(node string) error {
 	n := s.getNode(node)
 	if n == nil {
-		return fmt.Errorf("invalid node %s", node)
+		return fmt.Errorf("invalid node [%s].", node)
 	}
 	return n.downMaterBackup()
 }
@@ -310,7 +310,7 @@ func (s *Server) DownMasterBackup(node string) error {
 func (s *Server) DownSlave(node string) error {
 	n := s.getNode(node)
 	if n == nil {
-		return fmt.Errorf("invalid node %s", node)
+		return fmt.Errorf("invalid node [%s].", node)
 	}
 	return n.downSlave()
 }
@@ -325,7 +325,7 @@ func (s *Server) parseNodes() error {
 
 	for _, v := range cfg.Nodes {
 		if _, ok := s.nodes[v.Name]; ok {
-			return fmt.Errorf("duplicate node %s", v.Name)
+			return fmt.Errorf("duplicate node [%s].", v.Name)
 		}
 
 		n, err := s.parseNode(v)
@@ -347,7 +347,7 @@ func (s *Server) parseNode(cfg config.NodeConfig) (*Node, error) {
 	n.downAfterNoAlive = time.Duration(cfg.DownAfterNoAlive) * time.Second
 
 	if len(cfg.Master) == 0 {
-		return nil, fmt.Errorf("must set master mysql")
+		return nil, fmt.Errorf("must setting master MySQL node.")
 	}
 
 	var err error
