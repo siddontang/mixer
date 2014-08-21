@@ -129,14 +129,14 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 			var nodeSection = fmt.Sprintf("Schemas[%s]-Node[ %v ]", db, name)
 
 			if node.master != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Master", node.master.ConfigString()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Master", node.master.String()})
 			}
 			if node.masterBackup != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Master_Backup", node.masterBackup.ConfigString()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Master_Backup", node.masterBackup.String()})
 			}
 
 			if node.slave != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Slave", node.slave.ConfigString()})
+				nodeRows = append(nodeRows, []string{nodeSection, "Slave", node.slave.String()})
 			}
 			nodeRows = append(nodeRows, []string{nodeSection, "Last_Master_Ping", fmt.Sprintf("%v", time.Unix(node.lastMasterPing, 0))})
 
@@ -151,19 +151,17 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 		if defaultRule.DB == db {
 			if defaultRule.DB == db {
 				rows = append(rows, []string{fmt.Sprintf("Schemas[%s]_Rule_Default", db),
-					"Default_Table", defaultRule.ConfigString()})
+					"Default_Table", defaultRule.String()})
 			}
 		}
 		for tb, r := range schema.rule.Rules {
 			if r.DB == db {
 				rows = append(rows, []string{fmt.Sprintf("Schemas[%s]_Rule_Table", db),
-					fmt.Sprintf("Table[ %s ]", tb), r.ConfigString()})
+					fmt.Sprintf("Table[ %s ]", tb), r.String()})
 			}
 		}
 
-		for i := range nodeRows {
-			rows = append(rows, nodeRows[i])
-		}
+		rows = append(rows, nodeRows...)
 
 	}
 

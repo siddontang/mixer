@@ -27,10 +27,6 @@ func (r *Rule) FindNodeIndex(key interface{}) int {
 }
 
 func (r *Rule) String() string {
-	return fmt.Sprintf("%s.%s?key=%v&shard=%s", r.DB, r.Table, r.Key, r.Type)
-}
-
-func (r *Rule) ConfigString() string {
 	return fmt.Sprintf("%s.%s?key=%v&shard=%s&nodes=%s",
 		r.DB, r.Table, r.Key, r.Type, strings.Join(r.Nodes, ", "))
 }

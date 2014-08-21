@@ -197,14 +197,19 @@ Empty set
 ## Range Sharding Example
 
 ```
-range rule:
--   db: mixer
-    table: mixer_test_shard_range
-    key: id
-    range: 
-    nodes: node2, node3
-    range: -10000-
-    type: range
+schemas :
+-
+  db : mixer
+  nodes: [node1, node2, node3]
+  rules:
+    default: node1
+    shard:
+      -   
+        table: mixer_test_shard_range
+        key: id
+        nodes: [node2, node3]
+        range: -10000-
+        type: range
 
 range algorithm: node key start <= value < node key stop
 
