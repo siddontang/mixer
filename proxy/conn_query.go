@@ -123,7 +123,7 @@ func (c *Conn) getConn(n *Node, isSelect bool) (co *client.SqlConn, err error) {
 	return
 }
 
-func (c *Conn) getShardConns(stmt sqlparser.Statement, bindVars map[string]interface{}) ([]*client.SqlConn, error) {
+func (c *Conn) getShardConns(isSelect bool,stmt sqlparser.Statement, bindVars map[string]interface{}) ([]*client.SqlConn, error) {
 	nodes, err := c.getShardList(stmt, bindVars)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (c *Conn) getShardConns(stmt sqlparser.Statement, bindVars map[string]inter
 
 	var co *client.SqlConn
 	for _, n := range nodes {
-		co, err = c.getConn(n, true)
+		co, err = c.getConn(n, isSelect)
 		if err != nil {
 			break
 		}
@@ -236,7 +236,7 @@ func makeBindVars(args []interface{}) map[string]interface{} {
 func (c *Conn) handleSelect(stmt *sqlparser.Select, sql string, args []interface{}) error {
 	bindVars := makeBindVars(args)
 
-	conns, err := c.getShardConns(stmt, bindVars)
+	conns, err := c.getShardConns(true,stmt, bindVars)
 	if err != nil {
 		return err
 	} else if conns == nil {
@@ -288,7 +288,7 @@ func (c *Conn) commitShardConns(conns []*client.SqlConn) error {
 func (c *Conn) handleExec(stmt sqlparser.Statement, sql string, args []interface{}) error {
 	bindVars := makeBindVars(args)
 
-	conns, err := c.getShardConns(stmt, bindVars)
+	conns, err := c.getShardConns(false,stmt, bindVars)
 	if err != nil {
 		return err
 	} else if conns == nil {
