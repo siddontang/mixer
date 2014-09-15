@@ -1,15 +1,15 @@
 # Mixer
 
-Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for MySQL sharding.
+Mixer是一个使用Go语言开发用于解决MySQL的分片的轻量级解决方案。
 
-## Features
+## 功能
 
-- Supports basic SQL statements (select, insert, update, replace, delete)
-- Supports transactions
-- Splits reads and writes (not fully tested)
+- 支持基本的SQL语句 (select, insert, update, replace, delete)
+- 支持事务
+- 读写分离 (not fully tested)
 - MySQL HA
-- Basic SQL Routing
-- Supports prepared statement: `COM_STMT_PREPARE`, `COM_STMT_EXECUTE`, etc. 
+- 基本的SQL路由
+- 支持prepared: `COM_STMT_PREPARE`, `COM_STMT_EXECUTE`, etc. 
 
 ## TODO
 
@@ -46,23 +46,23 @@ It acts as a MySQL server too, clients can communicate with it using the MySQL p
 
 ### node
 
-Mixer uses nodes to represent the real remote MySQL servers. A node can have two MySQL servers:
+Mixer使用节点来代表真正的MySQL服务器. 一个节点可以包含两个MySQL服务器:
 
-+ master: main MySQL server, all write operations, read operations (if ```rw_split``` and slave are not set) will be executed here.
-All transactions will be executed here too.
-+ slave: if ```rw_split``` is set, any select operations will be executed here. (can not set)
++ master: MySQL主服务器, 所有的写操作、读操作(如果设置了```rw_split```单并没有设置slave)将在此服务器执行
+所有的事务也将在此服务器执行
++ slave: 如果设置了```rw_split```，所有的查询操作都将在此服务器执行（可以不设置）
 
-Notice:
+注意：
 
-+ You can use ```admin upnode``` or ```admin downnode``` commands to bring a specified MySQL server up or down.
-+ If the master was down, you must use an admin command to bring it up manually.
-+ You must set up MySQL replication for yourself, mixer does not do it.
++ 你可以使用```admin upnode```或```admin downnode```命令将指定的MySQL服务器上线或下线
++ 如果master下线，你必须使用admin命令来将他手动上线。
++ 你必须自行设置MySQL的replication，mixer不会做这些。
 
 ### schema
 
-Schema likes MySQL database, if a client executes ```use db``` command, ```db``` must exist in the schema.
+Schema类似MySQL的数据库，如果客户端执行了```use db``` 命令, ```db```必须是存在的schema。
 
-A schema contains one or more nodes. If a client use the specified schema, any command will be only routed to the node which belongs to the schema to be executed.
+一个schema可以包含一个或多个node，如果客户端使用了指定的schema，命令将被路由到schema包含的node上执行。
 
 ### rule
 

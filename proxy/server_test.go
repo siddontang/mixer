@@ -27,7 +27,6 @@ nodes :
     user: root
     password:
     master : 127.0.0.1:3306
-    master_backup : 
     slave : 
 - 
     name : node2

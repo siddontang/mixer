@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	Master       = "master"
-	MasterBackup = "master_backup"
-	Slave        = "slave"
+	Master = "master"
+	Slave  = "slave"
 )
 
 type Node struct {
@@ -25,9 +24,8 @@ type Node struct {
 	//running master db
 	db *client.DB
 
-	master       *client.DB
-	masterBackup *client.DB
-	slave        *client.DB
+	master *client.DB
+	slave  *client.DB
 
 	downAfterNoAlive time.Duration
 
@@ -108,7 +106,7 @@ func (n *Node) checkMaster() {
 	if int64(n.downAfterNoAlive) > 0 && time.Now().Unix()-n.lastMasterPing > int64(n.downAfterNoAlive) {
 		log.Error("%s down master db %s", n, n.master.Addr())
 
-		n.downMater()
+		n.downMaster()
 	}
 }
 
@@ -177,26 +175,6 @@ func (n *Node) upMaster(addr string) error {
 	return nil
 }
 
-func (n *Node) upMasterBackup(addr string) error {
-	n.Lock()
-	if n.masterBackup != nil {
-		n.Unlock()
-		return fmt.Errorf("%s master backup must be down first", n)
-	}
-	n.Unlock()
-
-	db, err := n.checkUpDB(addr)
-	if err != nil {
-		return err
-	}
-
-	n.Lock()
-	n.masterBackup = db
-	n.Unlock()
-
-	return nil
-}
-
 func (n *Node) upSlave(addr string) error {
 	n.Lock()
 	if n.slave != nil {
@@ -217,36 +195,10 @@ func (n *Node) upSlave(addr string) error {
 	return nil
 }
 
-func (n *Node) downMater() error {
+func (n *Node) downMaster() error {
 	n.Lock()
-	db := n.master
 	if n.master != nil {
 		n.master = nil
-	}
-
-	//switch db if exists
-	n.db = n.masterBackup
-
-	n.Unlock()
-
-	if db != nil {
-		db.Close()
-	}
-	return nil
-}
-
-func (n *Node) downMaterBackup() error {
-	n.Lock()
-
-	db := n.masterBackup
-
-	n.masterBackup = nil
-	n.db = n.master
-
-	n.Unlock()
-
-	if db != nil {
-		db.Close()
 	}
 	return nil
 }
@@ -264,7 +216,6 @@ func (n *Node) downSlave() error {
 	return nil
 }
 
-// Let node use master if using backup before
 func (s *Server) UpMaster(node string, addr string) error {
 	n := s.getNode(node)
 	if n == nil {
@@ -282,29 +233,13 @@ func (s *Server) UpSlave(node string, addr string) error {
 
 	return n.upSlave(addr)
 }
-
-func (s *Server) UpMasterBackup(node string, addr string) error {
-	n := s.getNode(node)
-	if n == nil {
-		return fmt.Errorf("invalid node %s", node)
-	}
-	return n.upMasterBackup(addr)
-}
-
 func (s *Server) DownMaster(node string) error {
 	n := s.getNode(node)
 	if n == nil {
 		return fmt.Errorf("invalid node %s", node)
 	}
-	return n.downMater()
-}
-
-func (s *Server) DownMasterBackup(node string) error {
-	n := s.getNode(node)
-	if n == nil {
-		return fmt.Errorf("invalid node [%s].", node)
-	}
-	return n.downMaterBackup()
+	n.db = nil
+	return n.downMaster()
 }
 
 func (s *Server) DownSlave(node string) error {
@@ -356,13 +291,6 @@ func (s *Server) parseNode(cfg config.NodeConfig) (*Node, error) {
 	}
 
 	n.db = n.master
-
-	if len(cfg.MasterBackup) > 0 {
-		if n.masterBackup, err = n.openDB(cfg.MasterBackup); err != nil {
-			log.Error(err.Error())
-			n.masterBackup = nil
-		}
-	}
 
 	if len(cfg.Slave) > 0 {
 		if n.slave, err = n.openDB(cfg.Slave); err != nil {
