@@ -53,6 +53,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		return nil, err
 	}
 
+	log.Info("Server run MySql Protocol Listen(%s) at [%s]", netProto, s.addr)
 	return s, nil
 }
 

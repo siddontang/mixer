@@ -15,19 +15,16 @@ var (
 )
 
 type RuleConfig struct {
-	config.RuleConfig
+	config.ShardConfig
 }
 
-func (c *RuleConfig) ParseRule() (*Rule, error) {
+func (c *RuleConfig) ParseRule(db string) (*Rule, error) {
 	r := new(Rule)
-	r.DB = c.DB
+	r.DB = db
 	r.Table = c.Table
 	r.Key = c.Key
 	r.Type = c.Type
-
-	if err := c.parseNodes(r); err != nil {
-		return nil, err
-	}
+	r.Nodes = c.Nodes
 
 	if err := c.parseShard(r); err != nil {
 		return nil, err
@@ -37,12 +34,13 @@ func (c *RuleConfig) ParseRule() (*Rule, error) {
 }
 
 func (c *RuleConfig) parseNodes(r *Rule) error {
+	// Note: did not used yet, by HuangChuanTong
 	reg, err := regexp.Compile(`(\w+)\((\d+)\-(\d+)\)`)
 	if err != nil {
 		return err
 	}
 
-	ns := strings.Split(c.Nodes, ",")
+	ns := c.Nodes // strings.Split(c.Nodes, ",")
 
 	nodes := map[string]struct{}{}
 

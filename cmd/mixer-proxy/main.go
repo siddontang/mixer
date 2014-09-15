@@ -12,7 +12,7 @@ import (
 	"syscall"
 )
 
-var configFile = flag.String("config", "/etc/mixer.conf", "mixer proxy config file")
+var configFile *string = flag.String("config", "/etc/mixer.conf", "mixer proxy config file")
 var logLevel *string = flag.String("log-level", "", "log level [debug|info|warn|error], default error")
 
 func main() {
@@ -21,13 +21,13 @@ func main() {
 	flag.Parse()
 
 	if len(*configFile) == 0 {
-		println("must use a config file")
+		log.Error("must use a config file")
 		return
 	}
 
 	cfg, err := config.ParseConfigFile(*configFile)
 	if err != nil {
-		println(err.Error())
+		log.Error(err.Error())
 		return
 	}
 
@@ -40,7 +40,7 @@ func main() {
 	var svr *proxy.Server
 	svr, err = proxy.NewServer(cfg)
 	if err != nil {
-		println(err.Error())
+		log.Error(err.Error())
 		return
 	}
 
@@ -52,8 +52,8 @@ func main() {
 		syscall.SIGQUIT)
 
 	go func() {
-		<-sc
-
+		sig := <-sc
+		log.Info("Got signal [%d] to exit.", sig)
 		svr.Close()
 	}()
 

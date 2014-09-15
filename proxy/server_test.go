@@ -51,29 +51,21 @@ schemas :
 -
     db : mixer 
     nodes: [node1, node2, node3]
+    rules:
+        default: node1 
+        shard:
+            -   
+                table: mixer_test_shard_hash
+                key: id
+                nodes: [node2, node3]
+                type: hash
 
-rules:
--   db: mixer
-    table: 
-    key:
-    nodes: node1
-    type: default
-
--   db: mixer
-    table: mixer_test_shard_hash
-    key: id
-    nodes: node2,node3
-    type: hash
-    
--   db: mixer
-    table: mixer_test_shard_range
-    key: id
-    range: 
-    nodes: node2, node3
-    #node2 : (-inf, 10000)
-    #node3 : [10000, +inf)
-    range: -10000-
-    type: range
+            -   
+                table: mixer_test_shard_range
+                key: id
+                nodes: [node2, node3]
+                range: -10000-
+                type: range
 `)
 
 func newTestServer(t *testing.T) *Server {
@@ -109,7 +101,7 @@ func newTestDB(t *testing.T) *client.DB {
 			t.Fatal(err)
 		}
 
-		testDB.SetIdleConns(4)
+		testDB.SetMaxIdleConnNum(4)
 	}
 
 	testDBOnce.Do(f)

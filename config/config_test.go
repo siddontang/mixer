@@ -12,47 +12,52 @@ func TestConfig(t *testing.T) {
 addr : 127.0.0.1:4000
 user : root
 password : 
+log_level : error
+
 nodes :
 - 
-    name : node1 
-    down_after_noalive : 300
-    idle_conns : 16
-    rw_split: true
-    user: root
-    password:
-    master : 127.0.0.1:3306
-    master_backup : 127.0.0.1:3307
-    slave : 127.0.0.1:4306
--
-    name : node2 
-    user: root
-    password:
-    master : 127.0.0.1:3308
+  name : node1 
+  down_after_noalive : 300
+  idle_conns : 16
+  rw_split: true
+  user: root
+  password:
+  master : 127.0.0.1:3306
+  master_backup : 127.0.0.1:3307
+  slave : 127.0.0.1:4306
+- 
+  name : node2
+  user: root
+  master : 127.0.0.1:3307
+
+- 
+  name : node3 
+  down_after_noalive : 300
+  idle_conns : 16
+  rw_split: false
+  user: root
+  password:
+  master : 127.0.0.1:3308
 
 schemas :
 -
-    db : mixer 
-    nodes: [node1, node2]
+  db : mixer 
+  nodes: [node1, node2, node3]
+  rules:
+    default: node1
+    shard:
+      -   
+        table: mixer_test_shard_hash
+        key: id
+        nodes: [node1, node2, node3]
+        type: hash
 
-rules:
--
-    db: mixer
-    table: test1 
-    key: id
-    type: hash
-    nodes: node(1-2)
--
-    db: mixer
-    table: test2 
-    key: name
-    nodes: node1,node2
-    type: range
-    range: -6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF-
--   db: mixer
-    table: 
-    key:
-    nodes: node1
-    type: default
+      -   
+        table: mixer_test_shard_range
+        key: id
+        type: range
+        nodes: [node2, node3]
+        range: -10000-
 `)
 
 	cfg, err := ParseConfigData(testConfigData)
@@ -60,16 +65,12 @@ rules:
 		t.Fatal(err)
 	}
 
-	if len(cfg.Nodes) != 2 {
+	if len(cfg.Nodes) != 3 {
 		t.Fatal(len(cfg.Nodes))
 	}
 
 	if len(cfg.Schemas) != 1 {
 		t.Fatal(len(cfg.Schemas))
-	}
-
-	if len(cfg.Rules) != 3 {
-		t.Fatal(len(cfg.Rules))
 	}
 
 	testNode := NodeConfig{
@@ -91,61 +92,60 @@ rules:
 		t.Fatal("node1 must equal")
 	}
 
-	testNode = NodeConfig{
+	testNode_2 := NodeConfig{
 		Name:   "node2",
 		User:   "root",
-		Master: "127.0.0.1:3308",
+		Master: "127.0.0.1:3307",
 	}
 
-	if !reflect.DeepEqual(cfg.Nodes[1], testNode) {
+	if !reflect.DeepEqual(cfg.Nodes[1], testNode_2) {
 		t.Fatal("node2 must equal")
 	}
 
+	testShard_1 := ShardConfig{
+		Table: "mixer_test_shard_hash",
+		Key:   "id",
+		Nodes: []string{"node1", "node2", "node3"},
+		Type:  "hash",
+	}
+	if !reflect.DeepEqual(cfg.Schemas[0].RulesConifg.ShardRule[0], testShard_1) {
+		t.Fatal("ShardConfig0 must equal")
+	}
+
+	testShard_2 := ShardConfig{
+		Table: "mixer_test_shard_range",
+		Key:   "id",
+		Nodes: []string{"node2", "node3"},
+		Type:  "range",
+		Range: "-10000-",
+	}
+	if !reflect.DeepEqual(cfg.Schemas[0].RulesConifg.ShardRule[1], testShard_2) {
+		t.Fatal("ShardConfig1 must equal")
+	}
+
+	if 2 != len(cfg.Schemas[0].RulesConifg.ShardRule) {
+		t.Fatal("ShardRule must 2")
+	}
+
+	testRules := RulesConfig{
+		Default:   "node1",
+		ShardRule: []ShardConfig{testShard_1, testShard_2},
+	}
+	if !reflect.DeepEqual(cfg.Schemas[0].RulesConifg, testRules) {
+		t.Fatal("RulesConfig must equal")
+	}
+
 	testSchema := SchemaConfig{
-		DB:    "mixer",
-		Nodes: []string{"node1", "node2"},
+		DB:          "mixer",
+		Nodes:       []string{"node1", "node2", "node3"},
+		RulesConifg: testRules,
 	}
 
 	if !reflect.DeepEqual(cfg.Schemas[0], testSchema) {
 		t.Fatal("schema must equal")
 	}
 
-	testRule := RuleConfig{
-		DB:    "mixer",
-		Table: "test1",
-		Key:   "id",
-		Nodes: "node(1-2)",
-		Type:  "hash",
-		Range: "",
-	}
-
-	if !reflect.DeepEqual(cfg.Rules[0], testRule) {
-		t.Fatal("rule0 must equal")
-	}
-
-	testRule = RuleConfig{
-		DB:    "mixer",
-		Table: "test2",
-		Key:   "name",
-		Nodes: "node1,node2",
-		Type:  "range",
-		Range: "-6FFFFFFFFFFFFFFF-AFFFFFFFFFFFFFFF-",
-	}
-
-	if !reflect.DeepEqual(cfg.Rules[1], testRule) {
-		t.Fatal("rule1 must equal")
-	}
-
-	testRule = RuleConfig{
-		DB:    "mixer",
-		Table: "",
-		Key:   "",
-		Nodes: "node1",
-		Type:  "default",
-		Range: "",
-	}
-
-	if !reflect.DeepEqual(cfg.Rules[2], testRule) {
-		t.Fatal("rule2 must equal")
+	if cfg.LogLevel != "error" || cfg.User != "root" || cfg.Password != "" || cfg.Addr != "127.0.0.1:4000" {
+		t.Fatal("Top Config not equal.")
 	}
 }

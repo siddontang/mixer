@@ -41,7 +41,7 @@ type RoutingPlan struct {
 		where id between 1 and 10
 		where id >= 1 and id < 10
 */
-func GetShardList(sql string, r *router.DBRules, bindVars map[string]interface{}) (nodes []string, err error) {
+func GetShardList(sql string, r *router.Router, bindVars map[string]interface{}) (nodes []string, err error) {
 	var stmt Statement
 	stmt, err = Parse(sql)
 	if err != nil {
@@ -51,7 +51,7 @@ func GetShardList(sql string, r *router.DBRules, bindVars map[string]interface{}
 	return GetStmtShardList(stmt, r, bindVars)
 }
 
-func GetShardListIndex(sql string, r *router.DBRules, bindVars map[string]interface{}) (nodes []int, err error) {
+func GetShardListIndex(sql string, r *router.Router, bindVars map[string]interface{}) (nodes []int, err error) {
 	var stmt Statement
 	stmt, err = Parse(sql)
 	if err != nil {
@@ -61,7 +61,7 @@ func GetShardListIndex(sql string, r *router.DBRules, bindVars map[string]interf
 	return GetStmtShardListIndex(stmt, r, bindVars)
 }
 
-func GetStmtShardList(stmt Statement, r *router.DBRules, bindVars map[string]interface{}) (nodes []string, err error) {
+func GetStmtShardList(stmt Statement, r *router.Router, bindVars map[string]interface{}) (nodes []string, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
@@ -78,7 +78,7 @@ func GetStmtShardList(stmt Statement, r *router.DBRules, bindVars map[string]int
 	return nodes, nil
 }
 
-func GetStmtShardListIndex(stmt Statement, r *router.DBRules, bindVars map[string]interface{}) (nodes []int, err error) {
+func GetStmtShardListIndex(stmt Statement, r *router.Router, bindVars map[string]interface{}) (nodes []int, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
@@ -220,7 +220,7 @@ func checkUpdateExprs(exprs UpdateExprs, rule *router.Rule) {
 	}
 }
 
-func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) {
+func getRoutingPlan(statement Statement, router *router.Router) (plan *RoutingPlan) {
 	plan = &RoutingPlan{}
 	var where *Where
 	switch stmt := statement.(type) {
@@ -229,7 +229,7 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 			panic(NewParserError("select in insert not allowed"))
 		}
 
-		plan.rule = r.GetRule(String(stmt.Table))
+		plan.rule = router.GetRule(String(stmt.Table))
 
 		if stmt.OnDup != nil {
 			checkUpdateExprs(UpdateExprs(stmt.OnDup), plan.rule)
@@ -243,29 +243,29 @@ func getRoutingPlan(statement Statement, r *router.DBRules) (plan *RoutingPlan) 
 			panic(NewParserError("select in replace not allowed"))
 		}
 
-		plan.rule = r.GetRule(String(stmt.Table))
+		plan.rule = router.GetRule(String(stmt.Table))
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
 		plan.fullList = makeList(0, len(plan.rule.Nodes))
 		return plan
 
 	case *Select:
-		plan.rule = r.GetRule(String(stmt.From[0]))
+		plan.rule = router.GetRule(String(stmt.From[0]))
 		where = stmt.Where
 	case *Update:
-		plan.rule = r.GetRule(String(stmt.Table))
+		plan.rule = router.GetRule(String(stmt.Table))
 
 		checkUpdateExprs(stmt.Exprs, plan.rule)
 
 		where = stmt.Where
 	case *Delete:
-		plan.rule = r.GetRule(String(stmt.Table))
+		plan.rule = router.GetRule(String(stmt.Table))
 		where = stmt.Where
 	}
 
 	if where != nil {
 		plan.criteria = where.Expr
 	} else {
-		plan.rule = r.DefaultRule
+		plan.rule = router.DefaultRule
 	}
 	plan.fullList = makeList(0, len(plan.rule.Nodes))
 

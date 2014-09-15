@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"github.com/siddontang/mixer/config"
+	"strings"
 )
 
 type Rule struct {
@@ -26,27 +27,21 @@ func (r *Rule) FindNodeIndex(key interface{}) int {
 }
 
 func (r *Rule) String() string {
-	return fmt.Sprintf("%s:%s", r.DB, r.Table)
+	return fmt.Sprintf("%s.%s?key=%v&shard=%s&nodes=%s",
+		r.DB, r.Table, r.Key, r.Type, strings.Join(r.Nodes, ", "))
 }
 
-type DBRules struct {
-	DB          string
-	Rules       map[string]*Rule
-	DefaultRule *Rule
-}
-
-func NewDefaultDBRules(db string, node string) *DBRules {
-	r := new(DBRules)
-	r.DB = db
-	r.Rules = make(map[string]*Rule)
-	r.DefaultRule = &Rule{
+func NewDefaultRule(db string, node string) *Rule {
+	var r *Rule = &Rule{
 		DB:    db,
 		Type:  DefaultRuleType,
-		Nodes: []string{node}}
+		Nodes: []string{node},
+		Shard: new(DefaultShard),
+	}
 	return r
 }
 
-func (r *DBRules) GetRule(table string) *Rule {
+func (r *Router) GetRule(table string) *Rule {
 	rule := r.Rules[table]
 	if rule == nil {
 		return r.DefaultRule
@@ -55,56 +50,56 @@ func (r *DBRules) GetRule(table string) *Rule {
 	}
 }
 
-func (r *DBRules) String() string {
-	return r.DB
-}
-
 type Router struct {
-	Rules map[string]*DBRules
+	DB          string
+	Rules       map[string]*Rule //key is <table name>
+	DefaultRule *Rule
+	nodes       []string //just for human saw
 }
 
-func (r *Router) GetDBRules(db string) *DBRules {
-	return r.Rules[db]
-}
+func NewRouter(schemaConfig *config.SchemaConfig) (*Router, error) {
 
-func (r *Router) GetRule(db string, table string) *Rule {
-	dbRule := r.Rules[db]
-	if dbRule == nil {
-		return nil
+	if !includeNode(schemaConfig.Nodes, schemaConfig.RulesConifg.Default) {
+		return nil, fmt.Errorf("default node[%s] not in the nodes list.",
+			schemaConfig.RulesConifg.Default)
 	}
 
-	return dbRule.GetRule(table)
-}
-
-func NewRouter(cfg *config.Config) (*Router, error) {
 	rt := new(Router)
-	rt.Rules = make(map[string]*DBRules, len(cfg.Rules))
-	for _, r := range cfg.Rules {
-		rc := &RuleConfig{r}
+	rt.DB = schemaConfig.DB
+	rt.nodes = schemaConfig.Nodes
+	rt.Rules = make(map[string]*Rule, len(schemaConfig.RulesConifg.ShardRule))
+	rt.DefaultRule = NewDefaultRule(rt.DB, schemaConfig.RulesConifg.Default)
 
-		rule, err := rc.ParseRule()
+	for _, shard := range schemaConfig.RulesConifg.ShardRule {
+		rc := &RuleConfig{shard}
+		for _, node := range shard.Nodes {
+			if !includeNode(rt.nodes, node) {
+				return nil, fmt.Errorf("shard table[%s] node[%s] not in the schema.nodes list:[%s].",
+					shard.Table, node, strings.Join(shard.Nodes, ","))
+			}
+		}
+		rule, err := rc.ParseRule(rt.DB)
 		if err != nil {
 			return nil, err
 		}
 
-		dbRules, ok := rt.Rules[rule.DB]
-		if !ok {
-			dbRules = &DBRules{DB: rule.DB}
-			dbRules.Rules = make(map[string]*Rule)
-			rt.Rules[rule.DB] = dbRules
-		}
-
 		if rule.Type == DefaultRuleType {
-			if dbRules.DefaultRule != nil {
-				return nil, fmt.Errorf("default rule duplicate, must only one")
-			}
-			dbRules.DefaultRule = rule
+			return nil, fmt.Errorf("[default-rule] duplicate, must only one.")
 		} else {
-			if _, ok := dbRules.Rules[rule.Table]; ok {
+			if _, ok := rt.Rules[rule.Table]; ok {
 				return nil, fmt.Errorf("table %s rule in %s duplicate", rule.Table, rule.DB)
 			}
-			dbRules.Rules[rule.Table] = rule
+			rt.Rules[rule.Table] = rule
 		}
 	}
 	return rt, nil
+}
+
+func includeNode(nodes []string, node string) bool {
+	for _, n := range nodes {
+		if n == node {
+			return true
+		}
+	}
+	return false
 }

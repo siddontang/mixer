@@ -98,7 +98,7 @@ var (
 
 // Show
 %token <empty> SHOW
-%token <empty> DATABASES TABLES
+%token <empty> DATABASES TABLES PROXY
 
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
@@ -288,11 +288,15 @@ admin_statement:
 show_statement:
   SHOW DATABASES 
   {
-    $$ = &Show{Name: "databases"}
+    $$ = &Show{Section: "databases"}
   }
 | SHOW TABLES from_opt like_or_where_opt 
   {
-    $$ = &Show{Name: "tables", From: $3, LikeOrWhere: $4}
+    $$ = &Show{Section: "tables", From: $3, LikeOrWhere: $4}
+  }
+| SHOW PROXY sql_id from_opt like_or_where_opt
+  {
+    $$ = &Show{Section: "proxy", Key: string($3), From: $4, LikeOrWhere: $5}
   }
 
 create_statement:

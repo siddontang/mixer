@@ -1,11 +1,10 @@
 package proxy
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/siddontang/mixer/hack"
 	. "github.com/siddontang/mixer/mysql"
 	"github.com/siddontang/mixer/sqlparser"
-	"strconv"
 	"strings"
 )
 
@@ -54,44 +53,7 @@ func (c *Conn) handleSimpleSelect(sql string, stmt *sqlparser.SimpleSelect) erro
 	return c.writeResultset(c.status, r)
 }
 
-func formatValue(value interface{}) ([]byte, error) {
-	switch v := value.(type) {
-	case int8:
-		return strconv.AppendInt(nil, int64(v), 10), nil
-	case int16:
-		return strconv.AppendInt(nil, int64(v), 10), nil
-	case int32:
-		return strconv.AppendInt(nil, int64(v), 10), nil
-	case int64:
-		return strconv.AppendInt(nil, int64(v), 10), nil
-	case int:
-		return strconv.AppendInt(nil, int64(v), 10), nil
-	case uint8:
-		return strconv.AppendUint(nil, uint64(v), 10), nil
-	case uint16:
-		return strconv.AppendUint(nil, uint64(v), 10), nil
-	case uint32:
-		return strconv.AppendUint(nil, uint64(v), 10), nil
-	case uint64:
-		return strconv.AppendUint(nil, uint64(v), 10), nil
-	case uint:
-		return strconv.AppendUint(nil, uint64(v), 10), nil
-	case float32:
-		return strconv.AppendFloat(nil, float64(v), 'f', -1, 64), nil
-	case float64:
-		return strconv.AppendFloat(nil, float64(v), 'f', -1, 64), nil
-	case []byte:
-		return v, nil
-	case string:
-		return hack.Slice(v), nil
-	default:
-		return nil, fmt.Errorf("invalid type %T", value)
-	}
-}
-
 func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []byte) (*Resultset, error) {
-	r := new(Resultset)
-
 	field := &Field{}
 
 	field.Name = name
@@ -102,35 +64,63 @@ func (c *Conn) buildSimpleSelectResult(value interface{}, name []byte, asName []
 
 	field.OrgName = name
 
-	var row []byte
-	var err error
+	formatField(field, value)
 
-	switch value.(type) {
-	case int8, int16, int32, int64, int:
-		field.Charset = 63
-		field.Type = MYSQL_TYPE_LONGLONG
-		field.Flag = BINARY_FLAG | NOT_NULL_FLAG
-	case uint8, uint16, uint32, uint64, uint:
-		field.Charset = 63
-		field.Type = MYSQL_TYPE_LONGLONG
-		field.Flag = BINARY_FLAG | NOT_NULL_FLAG | UNSIGNED_FLAG
-	case string, []byte:
-		field.Charset = 33
-		field.Type = MYSQL_TYPE_VAR_STRING
-	default:
-		return nil, fmt.Errorf("unsupport type %T for resultset", value)
-	}
-
-	row, err = formatValue(value)
-
+	r := &Resultset{Fields: []*Field{field}}
+	row, err := formatValue(value)
 	if err != nil {
 		return nil, err
 	}
-
-	r.Fields = []*Field{field}
-
-	r.RowDatas = append(r.RowDatas,
-		PutLengthEncodedString(row))
+	r.RowDatas = append(r.RowDatas, PutLengthEncodedString(row))
 
 	return r, nil
+}
+
+func (c *Conn) handleFieldList(data []byte) error {
+	index := bytes.IndexByte(data, 0x00)
+	table := string(data[0:index])
+	wildcard := string(data[index+1:])
+
+	if c.schema == nil {
+		return NewDefaultError(ER_NO_DB_ERROR)
+	}
+
+	nodeName := c.schema.rule.GetRule(table).Nodes[0]
+
+	n := c.server.getNode(nodeName)
+
+	co, err := n.getMasterConn()
+	if err != nil {
+		return err
+	}
+	defer co.Close()
+
+	if err = co.UseDB(c.schema.db); err != nil {
+		return err
+	}
+
+	if fs, err := co.FieldList(table, wildcard); err != nil {
+		return err
+	} else {
+		return c.writeFieldList(c.status, fs)
+	}
+}
+
+func (c *Conn) writeFieldList(status uint16, fs []*Field) error {
+	c.affectedRows = int64(-1)
+
+	data := make([]byte, 4, 1024)
+
+	for _, v := range fs {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		if err := c.writePacket(data); err != nil {
+			return err
+		}
+	}
+
+	if err := c.writeEOF(status); err != nil {
+		return err
+	}
+	return nil
 }

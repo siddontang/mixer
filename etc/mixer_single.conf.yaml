@@ -6,7 +6,7 @@ addr : 127.0.0.1:4000
 # server user and password
 user : root
 password :
- 
+
 # log level[debug|info|warn|error],default error
 log_level : error
 
@@ -15,7 +15,7 @@ nodes :
 - 
     name : node1 
 
-    # default idle conns for mysql server
+    # default max idle conns for mysql server
     idle_conns : 16
 
     # if rw_split is true, select will use slave server
@@ -23,7 +23,7 @@ nodes :
 
     # all mysql in a node must have the same user and password
     user : root
-    password: 
+    password : 
 
     # master represents a real mysql master server 
     master : 127.0.0.1:3306
@@ -40,21 +40,14 @@ nodes :
 
 
 
-
 # schema defines which db can be used by client and this db's sql will be executed in which nodes
 schemas :
 -
     db : mixer 
     nodes: [node1]
-
-
-# rule defines how sql executed in nodes
-rules:
--   
-    db: mixer
-    table: 
-    key:
-    nodes: node1
-
-    # any other table not set above will use default rule
-    type: default
+    rules:
+        # any other table not set above will use default [node1]
+        default: node1
+        shard:
+            # empty shard tables rule
+            -

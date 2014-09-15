@@ -925,7 +925,8 @@ func (node *Admin) Format(buf *TrackedBuffer) {
 }
 
 type Show struct {
-	Name        string
+	Section     string
+	Key         string
 	From        ValExpr
 	LikeOrWhere Expr
 }
@@ -933,5 +934,5 @@ type Show struct {
 func (*Show) IStatement() {}
 
 func (node *Show) Format(buf *TrackedBuffer) {
-	buf.Fprintf("show %s %v %v", node.Name, node.From, node.LikeOrWhere)
+	buf.Fprintf("show %s %s %v %v", node.Section, node.Key, node.From, node.LikeOrWhere)
 }

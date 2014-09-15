@@ -20,17 +20,22 @@ type NodeConfig struct {
 }
 
 type SchemaConfig struct {
-	DB    string   `yaml:"db"`
-	Nodes []string `yaml:"nodes"`
+	DB          string      `yaml:"db"`
+	Nodes       []string    `yaml:"nodes"`
+	RulesConifg RulesConfig `yaml:"rules"`
 }
 
-type RuleConfig struct {
-	DB    string `yaml:"db"`
-	Table string `yaml:"table"`
-	Key   string `yaml:"key"`
-	Nodes string `yaml:"nodes"`
-	Type  string `yaml:"type"`
-	Range string `yaml:"range"`
+type RulesConfig struct {
+	Default   string        `yaml:"default"`
+	ShardRule []ShardConfig `yaml:"shard"`
+}
+
+type ShardConfig struct {
+	Table string   `yaml:"table"`
+	Key   string   `yaml:"key"`
+	Nodes []string `yaml:"nodes"`
+	Type  string   `yaml:"type"`
+	Range string   `yaml:"range"`
 }
 
 type Config struct {
@@ -42,8 +47,6 @@ type Config struct {
 	Nodes []NodeConfig `yaml:"nodes"`
 
 	Schemas []SchemaConfig `yaml:"schemas"`
-
-	Rules []RuleConfig `yaml:"rules"`
 }
 
 func ParseConfigData(data []byte) (*Config, error) {

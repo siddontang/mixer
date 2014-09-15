@@ -8,37 +8,27 @@ import (
 	"testing"
 )
 
-/*
-   range:
-   node1: (-inf, 10000)
-   node2: [10000, 20000)
-   node3: [20000, +inf]
-*/
-
-func newTestDBRule() *router.DBRules {
+func newTestDBRule() *router.Router {
 	var s = `
-rules:
+schemas :
 -
-    db: mixer
-    table: test1
-    key: id
-    type: hash
-    nodes: node(1-10)
+  db : mixer 
+  nodes: [node1,node2,node3,node4,node5,node6,node7,node8,node9,node10]
+  rules:
+    default: node1
+    shard:
+      -   
+        table: test1
+        key: id
+        nodes: [node1,node2,node3,node4,node5,node6,node7,node8,node9,node10]
+        type: hash
 
--
-    db: mixer
-    table: test2 
-    key: id
-    nodes: node1,node2,node3    
-    type: range
-    # range is -inf-10000 10000-20000 20000-+inf 
-    range: -10000-20000-
-
--   db: mixer
-    table: 
-    key:
-    nodes: node1
-    type: default
+      -   
+        table: test2
+        key: id
+        type: range
+        nodes: [node1,node2,node3]
+        range: -10000-20000-
 `
 
 	cfg, err := config.ParseConfigData([]byte(s))
@@ -49,13 +39,13 @@ rules:
 
 	var r *router.Router
 
-	r, err = router.NewRouter(cfg)
+	r, err = router.NewRouter(&cfg.Schemas[0])
 	if err != nil {
 		println(err.Error())
 		panic(err)
 	}
 
-	return r.GetDBRules("mixer")
+	return r
 }
 
 func checkSharding(t *testing.T, sql string, args []int, checkNodeIndex ...int) {
@@ -72,10 +62,10 @@ func checkSharding(t *testing.T, sql string, args []int, checkNodeIndex ...int) 
 		s := fmt.Sprintf("%v %v", ns, checkNodeIndex)
 		t.Fatal(sql, s)
 	} else {
-
 		for i := range ns {
 			if ns[i] != checkNodeIndex[i] {
 				s := fmt.Sprintf("%v %v", ns, checkNodeIndex)
+				panic(sql)
 				t.Fatal(sql, s, i)
 			}
 		}

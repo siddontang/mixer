@@ -22,7 +22,7 @@ func TestSimpleSelect(t *testing.T) {
 	testParse(t, sql)
 }
 
-func TestAdmin(t *testing.T) {
+func TestMixer(t *testing.T) {
 	sql := `admin upnode("node1", "master", "127.0.0.1")`
 	testParse(t, sql)
 
@@ -36,5 +36,8 @@ func TestAdmin(t *testing.T) {
 	testParse(t, sql)
 
 	sql = "show tables from abc where a = 1"
+	testParse(t, sql)
+
+	sql = "show proxy abc"
 	testParse(t, sql)
 }
