@@ -7,7 +7,7 @@ Mixer is a MySQL proxy powered by Go which aims to supply a simple solution for 
 - Supports basic SQL statements (select, insert, update, replace, delete)
 - Supports transactions
 - Splits reads and writes (not fully tested)
-- MySQL HA, switches to backup automatically if main crashes (not fully tested)
+- MySQL HA
 - Basic SQL Routing
 - Supports prepared statement: `COM_STMT_PREPARE`, `COM_STMT_EXECUTE`, etc. 
 
@@ -46,11 +46,10 @@ It acts as a MySQL server too, clients can communicate with it using the MySQL p
 
 ### node
 
-Mixer uses nodes to represent the real remote MySQL servers. A node can have three MySQL servers:
+Mixer uses nodes to represent the real remote MySQL servers. A node can have two MySQL servers:
 
 + master: main MySQL server, all write operations, read operations (if ```rw_split``` and slave are not set) will be executed here.
 All transactions will be executed here too.
-+ master backup: if the master was down, the mixer can switch over to the backup MySQL server. (can not set)
 + slave: if ```rw_split``` is set, any select operations will be executed here. (can not set)
 
 Notice:

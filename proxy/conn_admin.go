@@ -38,8 +38,6 @@ func (c *Conn) adminUpNodeServer(values sqlparser.ValExprs) error {
 	switch sType {
 	case Master:
 		return c.server.UpMaster(nodeName, addr)
-	case MasterBackup:
-		return c.server.UpMasterBackup(nodeName, addr)
 	case Slave:
 		return c.server.UpSlave(nodeName, addr)
 	default:
@@ -58,8 +56,6 @@ func (c *Conn) adminDownNodeServer(values sqlparser.ValExprs) error {
 	switch sType {
 	case Master:
 		return c.server.DownMaster(nodeName)
-	case MasterBackup:
-		return c.server.DownMasterBackup(nodeName)
 	case Slave:
 		return c.server.DownSlave(nodeName)
 	default:
