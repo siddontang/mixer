@@ -14,9 +14,8 @@ type NodeConfig struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 
-	Master       string `yaml:"master"`
-	MasterBackup string `yaml:"master_backup"`
-	Slave        string `yaml:"slave"`
+	Master string `yaml:"master"`
+	Slave  string `yaml:"slave"`
 }
 
 type SchemaConfig struct {

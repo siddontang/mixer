@@ -23,7 +23,6 @@ nodes :
   user: root
   password:
   master : 127.0.0.1:3306
-  master_backup : 127.0.0.1:3307
   slave : 127.0.0.1:4306
 - 
   name : node2
@@ -82,9 +81,8 @@ schemas :
 		User:     "root",
 		Password: "",
 
-		Master:       "127.0.0.1:3306",
-		MasterBackup: "127.0.0.1:3307",
-		Slave:        "127.0.0.1:4306",
+		Master: "127.0.0.1:3306",
+		Slave:  "127.0.0.1:4306",
 	}
 
 	if !reflect.DeepEqual(cfg.Nodes[0], testNode) {

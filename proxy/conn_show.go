@@ -131,9 +131,6 @@ func (c *Conn) handleShowProxyConfig() (*Resultset, error) {
 			if node.master != nil {
 				nodeRows = append(nodeRows, []string{nodeSection, "Master", node.master.String()})
 			}
-			if node.masterBackup != nil {
-				nodeRows = append(nodeRows, []string{nodeSection, "Master_Backup", node.masterBackup.String()})
-			}
 
 			if node.slave != nil {
 				nodeRows = append(nodeRows, []string{nodeSection, "Slave", node.slave.String()})

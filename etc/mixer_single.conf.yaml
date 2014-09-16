@@ -28,9 +28,6 @@ nodes :
     # master represents a real mysql master server 
     master : 127.0.0.1:3306
 
-    # master backup server 
-    master_backup : 
-
     # slave represents a real mysql salve server 
     slave : 
 
