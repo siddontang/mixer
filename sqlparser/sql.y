@@ -286,9 +286,9 @@ admin_statement:
   }
 
 show_statement:
-  SHOW DATABASES 
+  SHOW DATABASES like_or_where_opt 
   {
-    $$ = &Show{Section: "databases"}
+    $$ = &Show{Section: "databases", LikeOrWhere: $3}
   }
 | SHOW TABLES from_opt like_or_where_opt 
   {
