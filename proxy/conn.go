@@ -221,7 +221,7 @@ func (c *Conn) readHandshakeResponse() error {
 
 	pos += authLen
 
-	if c.capability|CLIENT_CONNECT_WITH_DB > 0 {
+	if c.capability&CLIENT_CONNECT_WITH_DB > 0 {
 		if len(data[pos:]) == 0 {
 			return nil
 		}
